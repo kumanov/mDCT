@@ -92,7 +92,7 @@ goto :mDCT_Begin
 
 	:: end parse, if no more args
 	IF "%~1"=="" exit /b
-	
+
 	IF "%~1"=="-?" set _Usage=1
 
 	for %%i in (help /help -help -h /h) do (
@@ -871,7 +871,7 @@ if %errorlevel%==0 (
 	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
 	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
 	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir  /o-d /s c:\users\*.dmp
-	
+
 	call :logitem crash control registry settings
 	set _RegFile=!_DirWork!\CrashDumps\RegCrashControl.txt
 	call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\CrashControl" /s
@@ -998,7 +998,7 @@ if !_PSVer! LEQ 2 (
 			goto :off_nocab
 			@exit /b 1)
 )
-	
+
 @echo.
 
 call :showlogitem  *** %time% : %~n0 diagnostic files are in:
@@ -1057,7 +1057,7 @@ call :play_attention_sound
 ::		"C:\Windows\WindowsUpdate.log"
 ::			Windows Update logs are now generated using ETW (Event Tracing for Windows).
 ::			Please run the Get-WindowsUpdateLog PowerShell command to convert ETW traces into a readable WindowsUpdate.log.
-::			
+::
 ::			For more information, please visit http://go.microsoft.com/fwlink/?LinkId=518345
 
 :: - [x] Reg query power settings -> Turn off fast startup (/v HiberbootEnabled)
@@ -1074,4 +1074,3 @@ call :play_attention_sound
 call :logitem done.
 endlocal
 @echo.&goto:eof
-
