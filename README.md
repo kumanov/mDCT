@@ -32,6 +32,7 @@ mDCT updates on: https://github.com/
   - WMI root:/ security descriptor
   - Scheduled tasks query output
   - NlTestDomInfo
+  - reg query Policies Windows Defender
 - Network information
   - netstat -nato
   - ipconfig /displaydns

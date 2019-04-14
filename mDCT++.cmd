@@ -1,4 +1,4 @@
-:: Filename: mDCT.cmd - mini Data Collection Tool script + ext
+:: Filename: mDCT++.cmd - mini Data Collection Tool script ++ extensions
 @if "%_ECHO%" == "" ECHO OFF
 setlocal enableDelayedExpansion
 
@@ -11,47 +11,104 @@ setlocal enableDelayedExpansion
 ::  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ::  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+set _DirScript=%~dp0
+call :preRequisites
+if "%errorlevel%" neq "0" goto :eof
+call :Initialize %*
+call :CollectDctData
+call :getPerformanceLogs
+call :CollectAdditionalData
+call :compress
+:: delete source files, if compressed
+if "%errorlevel%"=="0" (
+	if exist %_DirScript%!cabName! (
+	call :logitem *** data archived - delete working folder '!_DirWork!'
+	RD /S /Q "!_DirWork!")
+)
+echo.done.
+@echo. & goto :eof
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:region check preRequisites
+:preRequisites
+	@echo ..check preRequisites
+	:: check current user account permissions - Admin required
+	call :check_Permissions
+	if "%errorlevel%" neq "0" goto :eof
+	
+	:: require no spaces in full path
+	if not "%_DirScript%"=="%_DirScript: =%" ( echo.
+		call :WriteHostNoLog yellow black  *** Your script execution path '%_DirScript%' contains one or more space characters
+		call :WriteHostNoLog yellow black  Please use a different local path without space characters.
+		exit /b 1
+	) else (
+		call :WriteHostNoLog green black Success: no spaces in script full path
+	)
+	
+	::TODO - user account membership : "Product Administrators" or "Local Engineers"
+	:: whoami /groups | findstr /irc:"Product Administrators" /c:"Local Engineers"
+
+	goto :eof
+:endregion
+
+:region initialize
+:initialize
 :: initialize variables
-set _ScriptVersion=v1.05
+set _ScriptVersion=v1.06
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-04-03
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
 
 :: Adding a Window Title
-REM.-- Set the title
 SET title=%~nx0 - version %_ScriptVersion%
 TITLE %title%
 
-::@::if defined _DbgOut ( echo.%time% : Start of mDCT ^(%_ScriptVersion% - krasimir.kumanov@gmail.com^))
-call :WriteHostNoLog white black %date% %time% : Start of mDCT [%_ScriptVersion% - krasimir.kumanov@gmail.com]
-
-:: handle /?
-if "%~1"=="/?" (
-	call :usage
-	@exit /b 0
-)
-
-@rem parsed args - off
-@set _Usage=
-@set _noCabZip=
-
-call :ArgsParse %*
-
-if /i "%_Usage%" EQU "1" ( call :usage
-					@exit /b 0 )
-
-set _DirScript=%~dp0
 if defined _DbgOut ( echo. %time% _DirScript: %_DirScript% )
-if not "%_DirScript%"=="%_DirScript: =%" ( echo.
-	echo  *** Your script execution path '%_DirScript%' contains one or more space characters, please use a different local path without space characters.
-	exit /b 1
-	)
 
 :: Change Directory to the location of the batch script file (%0)
 CD /d "%_DirScript%"
 @echo. .. starting '%_DirScript%%~n0 %*'
 
+
+::@::if defined _DbgOut ( echo.%time% : Start of mDCT++ ^(%_ScriptVersion% - krasimir.kumanov@gmail.com^))
+call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersion% - krasimir.kumanov@gmail.com]
+
+:region Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:: Settings for quick testing: in CMD use: 'set _DbgOut=1', use SET _Echo=1 to debug this script
+
+:: init variables
+	@set _Comp_Time=
+	@set _DirWork=
+	@set _LogFile=
+
+:: parsed args - off
+	@set _Usage=
+	@set _noDctData=
+	@set _noAddData=
+	@set _noCabZip=
+	@set _noBlg=
+
+:: regional settings ^(choose EN-US, DE-DE^) for localized Perfmon counter names, hardcode to EN-US, or choose _GetLocale=1
+	@set _locale=EN-US
+	@set _GetLocale=
+		
+:endregion Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:region parse args
+:: handle /?
+if "%~1"=="/?" (
+	call :usage
+	exit /b 0
+)
+
+
+call:ArgsParse %*
+
+if /i "%_Usage%" EQU "1" ( call :usage
+					@exit /b 0 )
+:endregion
 
 :: _OSVER* will be set in function getWinVer
 call :getWinVer
@@ -67,24 +124,29 @@ set _DirWork=%_DirScript%%_Comp_Time%
 
 if defined _DbgOut ( echo. %time% _DirWork: !_DirWork! )
 
+:: init working dir
+call :mkNewDir !_DirWork!
+:: init LogFile
+if not defined _LogFile set _LogFile=!_DirWork!\mDCTlog.txt
+if defined _DbgOut ( echo. %time% _LogFile: !_LogFile! )
+call :InitLog !_LogFile!
 
-:: check current user account permissions
-call :check_Permissions
-if "%errorlevel%" neq "0" goto :end
+:: change priority to idle - this & all child commands
+call :logitem change priority to IDLE
+wmic process where name="cmd.exe" CALL setpriority "idle"  >NUL 2>&1
 
+call :WriteHostNoLog blue black *** %_ScriptVersion% Dont click inside the script window while processing as it will cause the script to pause. ***
 
-:Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-:: Settings for quick testing: in CMD use: 'set _DbgOut=1', use SET _Echo=1 to debug this script
+if defined _GetLocale ( call :getLocale _locale )
 
-:: regional settings ^(choose EN-US, DE-DE^) for localized Perfmon counter names, hardcode to EN-US, or choose _GetLocale=1
-	@set _locale=EN-US
-	@set _GetLocale=1
-:end_of_Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+call :logOnlyItem  mDCT++ (krasimir.kumanov@gmail.com) -%_ScriptVersion% start invocation: '%_DirScript%%~n0 %*'
+call :logNoTimeItem  Windows version:  !v! Minor: !_OSVER4!
+call :showlogitem   ScriptVersion: %~n0 %_ScriptVersion% - DateTime: !_CurDateTime! Locale: !_locale! PSversion: %_PSVer%
 
+goto :eof
+:endregion
 
-goto :mDCT_Begin
-
-
+:region functions
 :ArgsParse
 	:: count number of arguments
 	set _argCount=0
@@ -99,16 +161,16 @@ goto :mDCT_Begin
 		if /i "%~1" equ "%%i" (set _Usage=1)
 	)
 
-	IF /i "%~1"=="all" set _ALL=1
-	IF /i "%~1"=="noblg" set _NoBlg=1
-	if /i "%~1"=="nocabzip" (set _noCabZip=1)
+	IF /i "%~1"=="noDctData" set _NoDctData=1
+	IF /i "%~1"=="noAddData" set _NoAddData=1
+	IF /i "%~1"=="noBlg" set _NoBlg=1
+	if /i "%~1"=="noCabZip" (set _noCabZip=1)
 
 	SHIFT
 	GOTO ArgsParse
 
 
 :check_Permissions
-	@echo.  Administrative permissions required. Detecting permissions...
 	net session >NUL 2>&1
 	if %errorLevel% == 0 (
 		call :WriteHostNoLog green black Success: Administrative permissions confirmed.
@@ -121,8 +183,6 @@ goto :mDCT_Begin
 		@pause
 		@exit /b 1
 	)
-
-
 
 :getWinVer - UTILITY to get Windows Version
 	:: #########################
@@ -156,9 +216,11 @@ goto :mDCT_Begin
 	set _CurDateTime=%_CurDateTime:~0,8%_%_CurDateTime:~8,6%
 	@goto :eof
 
-:getLocale - UTILITY to get System locale
-	echo . get System locale
-	FOR /F "delims==" %%G IN ('systeminfo.exe') Do  (
+:getLocale	-- UTILITY to get System locale
+::			-- %~1 [out]: output variable
+	SETLOCAL
+	@echo . get System locale
+	FOR /F "usebackq delims==" %%G IN (`systeminfo.exe 2^>NUL ^| find /i "System Locale"`) Do  (
 		set input=%%G
 		for /l %%a in (1,1,100) do @if "!input:~-1!"==" " set input=!input:~0,-1!
 		IF "!input:~0,13!"=="System Locale" (
@@ -167,8 +229,11 @@ goto :mDCT_Begin
 			set VERBOSE_SYSTEM_LOCALE=!answer:*;=!
 			call set SYSTEM_LOCALE_WITH_SEMICOLON=%%answer:!VERBOSE_SYSTEM_LOCALE!=%%
 			set SYSTEM_LOCALE=!SYSTEM_LOCALE_WITH_SEMICOLON:~0,-1!
-			@rem echo locale: !SYSTEM_LOCALE!
+			@rem echo locale: !SYSTEM_LOCALE! ::
 	   )
+	)
+	(ENDLOCAL & REM -- RETURN VALUES
+		IF "%~1" NEQ "" SET %~1=%SYSTEM_LOCALE%
 	)
 	@goto :eof
 
@@ -186,63 +251,64 @@ goto :mDCT_Begin
 @echo.                %~n0 noBlg - skip Experion Performance counters (*.blg) collection
 @echo.                %~n0 noCabZip - You can use param noCabZip to suppress data compresssion at end stage
 @echo.
-@echo. mDCT updates on: https://github.com/kumanov/mDCT
+@echo. mDCT++ updates on: https://github.com/kumanov/mDCT
 @echo. -^> see '%~n0 /help' for more detailed help info
-@echo. -^> Looking for help on specific keywords^? Try: mDCT /help ^|findstr /i /c:noblg
+@echo. -^> Looking for help on specific keywords^? Try: mDCT++ /help ^|findstr /i /c:noBlg
 @goto :eof
 
 :InitLog [LogFileName]
 	@if not exist %~1 (
-		@echo.%date% %time% . INITIALIZE file %~1 by %USERNAME% on %COMPUTERNAME% in Domain %USERDOMAIN% > %~1
-		@echo.mDCT [%_ScriptVersion%] 'krasimir.kumanov@gmail.com' >> %~1
-		@echo.>> %~1
+		@echo.%date% %time% . INITIALIZE file %~1 by %USERNAME% on %COMPUTERNAME% in Domain %USERDOMAIN% > "%~1"
+		@echo.mDCT++ [%_ScriptVersion%] 'krasimir.kumanov@gmail.com' >> "%~1"
+		@echo.>> "%~1"
 	)
 	@goto :eof
 
 :logitem  - UTILITY to write a message to the log file (no indent) and screen
-	@echo %date% %time% : %* >> !_LogFile!
+	@echo %date% %time% : %* >> "!_LogFile!"
 	@echo %time% : %*
 	@goto :eof
 
 :logOnlyItem  - UTILITY to write a message to the log file (no indent)
-	@echo %date% %time% : %* >> !_LogFile!
+	@echo %date% %time% : %* >> "!_LogFile!"
 	@goto :eof
 
 :logNoTimeItem  - UTILITY to write a message to the log file (no indent)
-	@echo. %* >> !_LogFile!
+	@echo. %* >> "!_LogFile!"
 	@goto :eof
 
 :showlogitem  - UTILITY to write a message to the log file (no time indent) and screen
-	@echo. %* >> !_LogFile!
+	@echo. %* >> "!_LogFile!"
 	@echo. %*
 	@goto :eof
 
 :doCmd  - UTILITY log execution and output of a command to the current log file
-	@echo ================================================================================== >> !_LogFile!
-	@echo ===== %time% : %* >> !_LogFile!
-	@echo ================================================================================== >> !_LogFile!
+	@echo ================================================================================== >> "!_LogFile!"
+	@echo ===== %time% : %* >> "!_LogFile!"
+	@echo ================================================================================== >> "!_LogFile!"
 	%* >> %_LogFile% 2>&1
-	@echo. >> !_LogFile!
+	@echo. >> "!_LogFile!"
 	call :SleepX 1
 	@goto :eof
 
 :doCmdNoLog  - UTILITY log execution of a command to the current log file
-	@echo ================================================================================== >>!_LogFile!
+	@echo ================================================================================== >> "!_LogFile!"
 	@echo ===== %time% : %* >> !_LogFile!
-	@echo ================================================================================== >> !_LogFile!
+	@echo ================================================================================== >> "!_LogFile!"
 	%*
-	@echo. >> !_LogFile!
+	@echo. >> "!_LogFile!"
 	@goto :eof
 
 :LogCmd [filename; command] - UTILITY to log command header and output in filename
+	SETLOCAL
 	for /f "tokens=1* delims=; " %%a in ("%*") do (
 		set _LogFileName=%%a
-		@echo ================================================================================== >> !_LogFileName!
-		@echo ===== %time% : %%b >> !_LogFileName!
-		@echo ================================================================================== >> !_LogFileName!
-		%%b >> !_LogFileName! 2>&1
+		@echo ================================================================================== >> "!_LogFileName!"
+		@echo ===== %time% : %%b >> "!_LogFileName!"
+		@echo ================================================================================== >> "!_LogFileName!"
+		%%b >> "!_LogFileName!" 2>&1
 	)
-	@echo. >> !_LogFileName!
+	@echo. >> "!_LogFileName!"
 	call :SleepX 1
 	@goto :eof
 
@@ -294,7 +360,7 @@ goto :mDCT_Begin
 	@goto :eof
 
 :DoNltestDomInfo [comment] - UTILITY to dump NLTEST Domain infos into log file
-	call :logitem .. collecting NLTEST Domain information at %~1
+	call :logitem . collecting NLTEST Domain information at %~1
 	set _NltestInfoFile=!_DirWork!\GeneralSystemInfo\NltestDomInfo.txt
 	call :InitLog !_NltestInfoFile!
 	call :LogCmd !_NltestInfoFile! nltest /dsgetsite
@@ -312,7 +378,7 @@ SETLOCAL ENABLEDELAYEDEXPANSION
 pushd "%temp%"
 :: define variables in .ddf file
 >directives.ddf echo ; Makecab Directive File
->>directives.ddf echo ; Created by mDCT script tool
+>>directives.ddf echo ; Created by mDCT++ script tool
 >>directives.ddf echo ; %date% %time%
 >>directives.ddf echo .Option Explicit
 >>directives.ddf echo .Set DiskDirectoryTemplate="%~2"
@@ -359,15 +425,15 @@ set bas=%~2
 if not defined bas set bas=%cd%
 for /f "tokens=*" %%a in ("%src%") do set src=%%~fa
 for /f "tokens=*" %%a in ("%bas%") do set bas=%%~fa
-set mat=&rem variable to store matching part of the name
-set upp=&rem variable to reference a parent
+set mat=&rem variable to store matching part of the name ::
+set upp=&rem variable to reference a parent ::
 for /f "tokens=*" %%a in ('echo.%bas:\=^&echo.%') do (
     set sub=!sub!%%a\
     call set tmp=%%src:!sub!=%%
     if "!tmp!" NEQ "!src!" (set mat=!sub!)ELSE (set upp=!upp!..\)
 )
 set src=%upp%!src:%mat%=!
-( ENDLOCAL & REM RETURN VALUES
+( ENDLOCAL & REM RETURN VALUES ::
     IF defined %1 (	SET %~1=%src%) ELSE ECHO.%src%
 )
 exit /b
@@ -389,201 +455,354 @@ exit /b
 	if errorlevel 1 ( call :logitem failed: %* )
 	@goto :eof
 
+:endregion
 
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-:mDCT_Begin section ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-call :WriteHostNoLog blue black *** %_ScriptVersion% Dont click inside the script window while processing as it will cause the script to pause. ***
+:region DCT Data
+:CollectDctData
+:: return, if no DCT data required
+if /i "!_NoDctData!" EQU "1" (goto :eof)
 
-:: init working dir
-call :mkNewDir !_DirWork!
-:: init LogFile
-if not defined _LogFile set _LogFile=!_DirWork!\mDCTlog.txt
-call :InitLog !_LogFile!
-if defined _GetLocale (
-	call :getLocale
-	set _locale=!SYSTEM_LOCALE!)
-
-call :logOnlyItem  mDCT (krasimir.kumanov@gmail.com) -%_ScriptVersion% start invocation: '%_DirScript%%~n0 %*'
-call :logNoTimeItem  Windows version:  !v! Minor: !_OSVER4!
-call :showlogitem   ScriptVersion: %~n0 %_ScriptVersion% - DateTime: !_CurDateTime! Locale: !_locale! PSversion: %_PSVer%
-
-:::::::::: debug call/goto :::::::::::::::::::::::
-::::::::::::::::::goto :CrashDumps
-
-:: change priority to idle - this & all child commands
-call :logitem change priority to IDLE
-wmic process where name="cmd.exe" CALL setpriority "idle"  >NUL 2>&1
+call :logitem *** DCT data collection ... ***
 
 :: GeneralSystemInfo folder
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 
-:whoami
-call :logitem whoami - currently logged on user
-call :LogCmd !_DirWork!\GeneralSystemInfo\whoami.txt whoami /all
-
-:EnvVariables
-call :logitem Windows Environment Variables
-call :LogCmd !_DirWork!\GeneralSystemInfo\EnvVariables.txt set
-
-:: SIDs
-:: skip it - take too long time on some computers !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-:: https://www.maketecheasier.com/find-user-security-identifier-windows/
-::@::call :SleepX 1
-::@::echo --Users and Groups SID
-::@::wmic useraccount get domain,name,sid > !_DirWork!\GeneralSystemInfo\UsersGroupsSID.txt
-::@::wmic group get domain,name,sid >> !_DirWork!\GeneralSystemInfo\UsersGroupsSID.txt
-
-:MSInfo32 /report
-call :logitem MSInfo32 export
+call :logitem MSInfo32 report
 call :doCmd msinfo32 /report !_DirWork!\GeneralSystemInfo\MSInfo32.txt
 
-:hosts file
 call :logitem Windows hosts file copy
 call :doCmd copy /y %windir%\System32\drivers\etc\hosts !_DirWork!\GeneralSystemInfo\
 
-:ipconfig.output
 call :logitem ipconfig output
 call :LogCmd !_DirWork!\GeneralSystemInfo\ipconfig.txt ipconfig /all
 
-:timezone
 call :logitem get time zone information
 call :doCmd wmic /output:!_DirWork!\GeneralSystemInfo\timezone.output.txt timezone get Bias, Description, StandardName
 
-:: export Windows Events
-call :logitem export Windows Events
+(call :logitem export Windows Events
 call :doCmd wevtutil epl Application !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Application.evtx /overwrite:true
 call :doCmd wevtutil epl FTE !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_FTE.evtx /overwrite:true
 call :doCmd wevtutil epl HwSnmp !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_HwSnmp.evtx /overwrite:true
 call :doCmd wevtutil epl HwSysEvt !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_HwSysEvt.evtx /overwrite:true
 call :doCmd wevtutil epl Security !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Security.evtx /overwrite:true
-call :doCmd wevtutil epl System !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.evtx /overwrite:true
+call :doCmd wevtutil epl System !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.evtx /overwrite:true)
 
-:: get Experion PKS Product Version file
 call :logitem get Experion PKS Product Version file
 call :doCmd copy /y "%HwInstallPath%\Experion PKS\ProductVersion.txt" !_DirWork!\GeneralSystemInfo\
 
-:: query services
 call :logitem query services
 call :DoGetSVC %time%
-call :DoNltestDomInfo %time%
+
+(call :logitem export Experion registry settings
+call :mkNewDir  !_DirWork!\RegistryInfo
+call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_CURRENT_USER\Software\Honeywell !_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt
+call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt
+call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Microsoft_Uninstall.txt
+)
+
+call :logitem get FTE logs
+call :doCmd xcopy /s/e/i/q/y/H "%HwProgramData%\ProductConfig\FTE\*.log" "!_DirWork!\FTELogs\"
+
+call :logitem get HMIWeb log files
+call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station-logs\"
+call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
+
+call :logitem task list /services
+call :mkNewDir  !_DirWork!\ServerDataDirectory
+call :LogCmd !_DirWork!\ServerDataDirectory\TaskList.txt tasklist /fo csv /svc
+
+where setpar >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion active log paranoids
+	call :mkNewDir !_DirWork!\SloggerLogs
+	call :LogCmd !_DirWork!\SloggerLogs\setpar.active.txt setpar /active
+)
+
+(::SloggerLogs
+:: R5xx
+if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
+	call :logitem get Experion log files
+	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\logfiles\log*.txt" "!_DirWork!\SloggerLogs\"
+	:: copy server log archives
+	if exist "%HwProgramData%\Experion PKS\logfiles\00-Server\" (
+		call :mkNewDir !_DirWork!\SloggerLogs\Archives
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\logfiles\00-Server\' -filt logServerY*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep 1} }}
+		if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
+	)
+)
+:: R4xx
+if exist "%HwProgramData%\Experion PKS\Server\data\log.txt" (
+	call :logitem get Experion log files
+	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\*log*.txt" "!_DirWork!\SloggerLogs\"
+)
+)
+
+if exist "%HWCONFIGSTUDIOLOGPATH%\Configuration Studio.log" (
+	call :mkNewDir !_DirWork!\Configuration Studio
+	call :logitem get Configuration Studio log file
+	call :doCmd copy /y "%HWCONFIGSTUDIOLOGPATH%\Configuration Studio.log*" "!_DirWork!\Configuration Studio\"
+)
+
+if exist "%HwProgramData%\Experion PKS\Server\data\Report\" (
+	call :logitem File Replication logs
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :mkNewDir !_DirWork!\ServerDataDirectory\File-Replication
+	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\Report\filrep*.*" "!_DirWork!\ServerDataDirectory\File-Replication\" /s
+)
+
+where almdmp >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion alarm/event dump
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :LogCmd !_DirWork!\ServerDataDirectory\almdmp.output.txt almdmp A 32000 S
+	call :LogCmd !_DirWork!\ServerDataDirectory\eventdmp.output.txt almdmp E 32000 S
+)
+
+where shheap >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion shheap output
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :logCmd !_DirWork!\ServerDataDirectory\shheap.1.output.txt shheap 1 struct
+    call :logCmd !_DirWork!\ServerDataDirectory\shheap.1.dump.output.txt shheap 1 dump
+    call :logCmd !_DirWork!\ServerDataDirectory\shheap.4.struct.output.txt shheap 4 struct
+)
+
+where bckbld >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion point back build
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :doCmd bckbld -out !_DirWork!\ServerDataDirectory\back_build.output.txt
+)
+
+where hdwbckbld >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion hardware back build
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :doCmd hdwbckbld -out !_DirWork!\ServerDataDirectory\hardware_back_build.output.txt
+)
+
+where hstdiag >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion history diagnostic
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :logCmd !_DirWork!\ServerDataDirectory\hstdiag.output.txt hstdiag
+)
+
+where embckbuilder >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion embckbuilder output
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.alarmgroup.output.txt  -ALARMGROUP
+    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.asset.output.txt  -ASSET
+    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.network.output.txt  -NETWORK
+    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.system.output.txt  -SYSTEM
+)
+
+if exist "%HwProgramData%\Experion PKS\Server\data\OPCIntegrator\" (
+	call :logitem Experion OPC Integrator
+	call :mkNewDir !_DirWork!\OPCIntegrator
+	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\OPCIntegrator\*.tsv" "!_DirWork!\OPCIntegrator\"
+)
+
+where listag >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem listag output
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :logCmd !_DirWork!\ServerDataDirectory\listag.output.txt listag -ALL
+)
+
+where fildmp >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion System Flags Table output
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\sysflg.output.txt -FILENUM 8 -RECORDS 1 -FORMAT HEX
+	call :logitem Experion Area Asignmnt Table output
+    call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\areaasignmnt.output.txt -FILENUM 7 -RECORDS 1,1001 -FORMAT HEX
+)
+
+if exist "%HwProgramData%\Experion PKS\Server\data\system.build" (
+	call :logitem copy system.build file
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\system.build" !_DirWork!\ServerDataDirectory\
+)
+
+if exist "%HwProgramData%\Experion PKS\Server\data\" (
+	call :logitem collect bad files .\server\data\*.bad
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\*.bad" !_DirWork!\ServerDataDirectory\
+)
+
+if exist "%HwProgramData%\TPNServer\TPNServer.log" (
+	call :logitem copy TPNServer.log file
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :doCmd copy /y "%HwProgramData%\TPNServer\TPNServer.log" !_DirWork!\ServerDataDirectory\
+)
+
+(::winsxs
+call :logitem list C:\Windows\winsxs\
+call :mkNewDir !_DirWork!\ServerDataDirectory
+call :logCmd !_DirWork!\ServerDataDirectory\winsxs.txt dir %windir%\winsxs)
+
+where liclist >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion license list - liclist
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog !_DirWork!\ServerRunDirectory\liclist.output.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\liclist.output.txt liclist
+)
+
+where hwlictool >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion license list - hwlictool
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog !_DirWork!\ServerRunDirectory\hwlictool.output.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool export -format:xml
+)
+
+where usrlrn >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem usrlrn usrlrn -p -a
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog !_DirWork!\ServerRunDirectory\usrlrn.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\usrlrn.txt usrlrn -p -a
+)
+
+where what >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem What - Getting Experion exe/dll and source file information
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog !_DirWork!\ServerRunDirectory\what.output.txt
+	for /r "%HwInstallPath%\Experion PKS\Server\run" %%a in (*.exe *.dll) do what "%%a" >>!_DirWork!\ServerRunDirectory\what.output.txt
+)
 
 
-:schtasks
-call :logitem scheduled task - query
+goto :eof
+:endregion
+
+:region Additional Data
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:CollectAdditionalData
+:: return, if no Additional data required
+if /i "!_NoAddData!" EQU "1" (goto :eof)
+
+call :logitem *** Additional data collection ... ***
+
+call :WindowsAddData
+call :NetworkAddData
+call :ExperionAddData
+call :SqlAddData
+
+goto :eof
+
+:region Windows
+:WindowsAddData
+call :logitem * Windows data *
+
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+
+call :logitem . whoami - currently logged in user
+call :InitLog !_DirWork!\GeneralSystemInfo\whoami.txt
+call :LogCmd !_DirWork!\GeneralSystemInfo\whoami.txt whoami /all
+
+call :logitem . scheduled task - query
 schtasks /query /xml ONE >!_DirWork!\GeneralSystemInfo\scheduled_tasks.xml
 
-:gpresult
-call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :logitem . collecting GPResult output
 set _GPresultFile=!_DirWork!\GeneralSystemInfo\GPresult.htm
-call :logitem collecting gpresult output
 call :doCmd gpresult /h !_GPresultFile! /f
 
-:powercfg
-call :logitem get power configuration settings - powercfg
-call :LogCmd !_DirWork!\GeneralSystemInfo\powercfg.txt powercfg -Q
+call :logitem . Windows Environment Variables
+call :InitLog !_DirWork!\GeneralSystemInfo\EnvVariables.txt
+call :LogCmd !_DirWork!\GeneralSystemInfo\EnvVariables.txt set
+
+call :DoNltestDomInfo %time%
+
+call :logitem . get power configuration settings
+set _powerCfgFile=!_DirWork!\GeneralSystemInfo\powercfg.txt
+call :InitLog !_powerCfgFile!
+call :LogCmd !_powerCfgFile! powercfg -Q
 :: reg query power settings
-call :logitem reg query power settings
-call :mkNewDir  !_DirWork!\RegistryInfo
-set _RegFile=!_DirWork!\GeneralSystemInfo\powercfg.txt
+call :logOnlyItem . reg query power settings
+set _RegFile=!_powerCfgFile!
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"  /s /t reg_dword
 ::  fast reboot - "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled
 
-
-:SystemInfo
-call :logitem collecting SystemInfo
+call :logitem . SystemInfo.exe output
+call :InitLog !_DirWork!\GeneralSystemInfo\SystemInfo.txt
 call :LogCmd !_DirWork!\GeneralSystemInfo\SystemInfo.txt systeminfo.exe
 
-:WmicQfeList
-call :logitem collecting Quick Fix Engineering information (Hotfixes)
+call :logitem . collecting Quick Fix Engineering information (Hotfixes)
 call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\Hotfixes.txt qfe list
 
-:WindowsUpdate.log
-call :logitem WindowsUpdate.log
-call :mkNewDir  !_DirWork!\GeneralSystemInfo
-call :doCmd copy /y "%windir%\WindowsUpdate.log" "!_DirWork!\GeneralSystemInfo\"
-if exist %windir%\Logs\WindowsUpdate (
-	call :logitem .. get Windows Update ETL Logs
-	call :mkNewDir  !_DirWork!\GeneralSystemInfo\WindowsUpdateEtlLogs
-	call :doCmd copy /y "%windir%\Logs\WindowsUpdate\*.etl" "!_DirWork!\GeneralSystemInfo\WindowsUpdateEtlLogs\"
-)
-
-:Honeywell_MsPatches
 if exist "%windir%\Honeywell_MsPatches.txt" (
 	call :logitem get Honeywell_MsPatches.txt
 	call :doCmd copy /y "%windir%\Honeywell_MsPatches.txt" "!_DirWork!\GeneralSystemInfo\"
 )
 
-:WmicProductList
-::@:: too slow and this information is available in DCT
-::@:: call :logitem MS Installation package task management - get name, version
-::@:: call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\InstallList.txt product get Description,Version,InstallDate
+call :logitem . WindowsUpdate.log
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :doCmd copy /y "%windir%\WindowsUpdate.log" "!_DirWork!\GeneralSystemInfo\"
+if exist %windir%\Logs\WindowsUpdate (
+	call :logitem . get Windows Update ETL Logs
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo\WindowsUpdateEtlLogs
+	call :doCmd copy /y "%windir%\Logs\WindowsUpdate\*.etl" "!_DirWork!\GeneralSystemInfo\WindowsUpdateEtlLogs\"
+)
 
 :WmiRootSecurityDescriptor
-call :logitem Wmi Root Security Descriptor
+call :logitem . WMI Root Security Descriptor
 call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\WmiRootSecurityDescriptor.txt /namespace:\\root path __systemsecurity call GetSecurityDescriptor
 
-
-:exportExperionRegistrySettings
-call :logitem export Experion registry settings
-call :mkNewDir  !_DirWork!\RegistryInfo
-call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_CURRENT_USER\Software\Honeywell !_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt
-call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt
-call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Microsoft_Uninstall.txt
+:: AV on accesss scanner settings
 call :doCmd REG EXPORT "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\HKLM_McAfee_OnAccessScanner.txt
 
-:getPerformanceLogs
-if /i "%_NoBlg%" EQU "1" goto :NoBlg
-call :logitem get Experion Performance Logs
-  ::@::xcopy /s/e/i/q/y/H "%HwProgramData%\Experion PKS\Perfmon\*.blg" "!_DirWork!\Perfmon Logs\"  1>NUL
-if not defined HWPERFLOGPATH set HWPERFLOGPATH=%HwProgramData%\Experion PKS\Perfmon
-if Not Exist "%HWPERFLOGPATH%" (
-	call :logOnlyItem perfmon folder Not Exist "%HWPERFLOGPATH%"
-	goto :NoBlg
-)
-call :mkNewDir !_DirWork!\Perfmon Logs
-PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci $env:HWPERFLOGPATH -filt *.blg | where{$_.LastWriteTime -gt (get-date).AddDays(-10)} | foreach{copy $_.fullName -dest '!_DirWork!\Perfmon Logs\'; sleep 1} }}
-if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy blg files with PowerShell'. )
-if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy blg files with PowerShell' failed.)
-:NoBlg
+set _SecurityFile=!_DirWork!\GeneralSystemInfo\SecurityCfg.txt
+call :InitLog !_SecurityFile!
+call :logitem . secedit /export /cfg "!_SecurityFile!"
+secedit /export /cfg !_SecurityFile! >> !_LogFile!
 
-:FteLogs
-call :logitem get FTE logs
-call :doCmd xcopy /s/e/i/q/y/H "%HwProgramData%\ProductConfig\FTE\*.log" "!_DirWork!\FTELogs\"
+call :logitem . query drivers information
+call :LogCmd !_DirWork!\GeneralSystemInfo\driverquery.output.csv driverquery /fo csv /v
+
+:: reg query Policies Windows Defender
+call :logOnlyItem . reg query Policies Windows Defender
+set _RegFile=!_DirWork!\GeneralSystemInfo\PoliciesWindowsDefender.txt
+call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
 
 
-:HMIWebLog
-call :logitem get HMIWeb log files
-call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station-logs\"
-call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
+goto :eof
+:endregion Windows
 
-:tasklist_svc
-call :logitem task list /services
-call :mkNewDir  !_DirWork!\ServerDataDirectory
-call :LogCmd !_DirWork!\ServerDataDirectory\TaskList.txt tasklist /fo csv /svc
+:region Network data
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:NetworkAddData
+call :logitem * Network configuration data *
 
-
-
-:: Network :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 call :mkNewDir !_DirWork!\Network
 
-:netstat connections
-call :logitem netstat connections
-call :LogCmd !_DirWork!\Network\netstat-nato.txt netstat -nato
+call :logitem . netstat connections
+set _NetStatFile=!_DirWork!\GeneralSystemInfo\netstat-nato.txt
+call :InitLog !_NetStatFile!
+call :LogCmd !_NetStatFile! netstat -nato
 
-:ipconfig_displaydns
-call :logitem ipconfig /displaydns
+call :logitem . ipconfig output
+call :InitLog !_DirWork!\Network\ipconfig.txt
+call :LogCmd !_DirWork!\Network\ipconfig.txt ipconfig /all
+call :InitLog !_DirWork!\Network\ipconfig.displaydns.txt
 call :LogCmd !_DirWork!\Network\ipconfig.displaydns.txt ipconfig /displaydns
 
 :NetSh_ConfigAndStats
-call :logitem netsh config/stats
-call :LogCmd !_DirWork!\Network\netsh.ipstats.txt      netsh interface ipv4 show ipstats
-call :LogCmd !_DirWork!\Network\netsh.tcpstats.txt     netsh interface ipv4 show tcpstats
-call :LogCmd !_DirWork!\Network\netsh.dynamicport.txt  netsh int ipv4 show dynamicport tcp
-call :LogCmd !_DirWork!\Network\netsh.global.txt       netsh int tcp show global
-call :LogCmd !_DirWork!\Network\netsh.ipv4.offload.txt netsh int ipv4 show offload
+call :logitem . netsh config/stats
+set _NetShFile=!_DirWork!\GeneralSystemInfo\netsh.output.txt
+call :InitLog !_NetShFile!
+call :LogCmd !_NetShFile! netsh interface ipv4 show ipstats
+call :LogCmd !_NetShFile! netsh interface ipv4 show tcpstats
+call :LogCmd !_NetShFile! netsh int ipv4 show dynamicport tcp
+call :LogCmd !_NetShFile! netsh int tcp show global
+call :LogCmd !_NetShFile! netsh int ipv4 show offload
 
 :nslookup
-call :logitem nslookup
+call :logitem . nslookup
 call :SleepX 1
 :: NS LookUp - Forward
 echo ======================================== > !_DirWork!\Network\nslookup.txt
@@ -602,34 +821,37 @@ for /f "usebackq tokens=2 delims=:" %%f in (`ipconfig ^| findstr /c:%ip_address_
 echo ======================================== >> !_DirWork!\Network\nslookup.txt
 echo %date% %time% - done>> !_DirWork!\Network\nslookup.txt
 
-:route_arp
-call :logitem route / arp
+call :logitem . route / arp
+call :InitLog !_DirWork!\Network\arp.txt
 call :LogCmd !_DirWork!\Network\arp.txt  arp -a -v
+call :InitLog !_DirWork!\Network\route.print.txt
 call :LogCmd !_DirWork!\Network\route.print.txt route print
 
-:nbtstat
-call :logitem nbtstat-n
+call :logitem . nbtstat-n
 call :InitLog !_DirWork!\Network\nbtstat.txt
 call :LogCmd !_DirWork!\Network\nbtstat.txt  nbtstat -n
 
 :advfirewall
-call :logitem firewall rules
-call :LogCmd !_DirWork!\Network\firewall_rules.txt netsh advfirewall firewall show rule name=all
+call :logitem . firewall rules
+call :InitLog !_DirWork!\Network\firewall_rules.txt
+call :LogCmd !_DirWork!\Network\firewall_rules.txt netsh advfirewall monitor show firewall verbose
 
-:net.commands
-call :logitem net commands
-call :LogCmd !_DirWork!\Network\netcmd.txt NET CONFIG SERVER
-call :LogCmd !_DirWork!\Network\netcmd.txt NET SESSION
-call :LogCmd !_DirWork!\Network\netcmd.txt NET SHARE
-call :LogCmd !_DirWork!\Network\netcmd.txt NET USER
-call :LogCmd !_DirWork!\Network\netcmd.txt NET USE
-call :LogCmd !_DirWork!\Network\netcmd.txt NET ACCOUNTS
-call :LogCmd !_DirWork!\Network\netcmd.txt NET CONFIG WKSTA
-call :LogCmd !_DirWork!\Network\netcmd.txt NET STATISTICS Workstation
-call :LogCmd !_DirWork!\Network\netcmd.txt NET STATISTICS SERVER
+call :logitem . net commands
+set _NetCmdFile=!_DirWork!\Network\netcmd.txt
+call :InitLog !_NetCmdFile!
+call :LogCmd !_NetCmdFile! NET SHARE
+call :LogCmd !_NetCmdFile! NET START
+call :LogCmd !_NetCmdFile! NET CONFIG SERVER
+call :LogCmd !_NetCmdFile! NET SESSION
+call :LogCmd !_NetCmdFile! NET USER
+call :LogCmd !_NetCmdFile! NET USE
+call :LogCmd !_NetCmdFile! NET ACCOUNTS
+call :LogCmd !_NetCmdFile! NET CONFIG WKSTA
+call :LogCmd !_NetCmdFile! NET STATISTICS Workstation
+call :LogCmd !_NetCmdFile! NET STATISTICS SERVER
 
-:TcpIpParameters
 set _RegFile=!_DirWork!\Network\TcpIpParameters.txt
+call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /v ArpRetryCount
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\Tcpip6\Parameters" /s
@@ -637,260 +859,78 @@ call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\tcpipreg" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\iphlpsvc" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002bE10318}" /s
 
+goto :eof
+:endregion NetworkAddData
 
-:driverquery
-call :logitem query drivers information
-call :LogCmd !_DirWork!\GeneralSystemInfo\driverquery.output.csv driverquery /fo csv /v
+:region Experion data
+:ExperionAddData
+call :logitem * Experion data *
 
-
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-::  Experion console station & server node
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-:setpar /active
-where setpar >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion active log paranoids
-	call :mkNewDir !_DirWork!\SloggerLogs
-	call :LogCmd !_DirWork!\SloggerLogs\setpar.active.txt setpar /active
-)
-
-:SloggerLogs
-:: R5xx
-if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
-	call :logitem get Experion log files
-	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\logfiles\log*.txt" "!_DirWork!\SloggerLogs\"
-	:: copy server log archives
-	if exist "%HwProgramData%\Experion PKS\logfiles\00-Server\" (
-		call :mkNewDir !_DirWork!\SloggerLogs\Archives
-		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\logfiles\00-Server\' -filt logServerY*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep 1} }}
-		if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
-		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
-	)
-)
-:: R4xx
-if exist "%HwProgramData%\Experion PKS\Server\data\log.txt" (
-	call :logitem get Experion log files
-	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\*log*.txt" "!_DirWork!\SloggerLogs\"
-)
-
-:CSLog - Configuration Studio.log
-if exist "%HWCONFIGSTUDIOLOGPATH%\Configuration Studio.log" (
-	call :mkNewDir !_DirWork!\Configuration Studio
-	call :logitem get Configuration Studio log file
-	call :doCmd copy /y "%HWCONFIGSTUDIOLOGPATH%\Configuration Studio.log*" "!_DirWork!\Configuration Studio\"
-)
-
-if exist "%HwProgramData%\Experion PKS\Server\data\Report\" (
-	call :logitem File Replication logs
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :mkNewDir !_DirWork!\ServerDataDirectory\File-Replication
-	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\Report\filrep*.*" "!_DirWork!\ServerDataDirectory\File-Replication\" /s
-)
-
-:almdmp
-where almdmp >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion alarm/event dump
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :LogCmd !_DirWork!\ServerDataDirectory\almdmp.output.txt almdmp A 32000 S
-	call :LogCmd !_DirWork!\ServerDataDirectory\eventdmp.output.txt almdmp E 32000 S
-)
-
-:shheap
-where shheap >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion shheap output
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :logCmd !_DirWork!\ServerDataDirectory\shheap.1.output.txt shheap 1 struct
-    call :logCmd !_DirWork!\ServerDataDirectory\shheap.1.dump.output.txt shheap 1 dump
-    call :logCmd !_DirWork!\ServerDataDirectory\shheap.4.struct.output.txt shheap 4 struct
-)
-
-:lisscn
 where lisscn >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem lisscn output
+	call :logitem . lisscn output
 	call :mkNewDir !_DirWork!\ServerDataDirectory
 	call :doCmd lisscn -all_ref -OUT !_DirWork!\ServerDataDirectory\lisscn_all.txt
 	call :doCmd lisscn -OUT !_DirWork!\ServerDataDirectory\lisscn.txt
 )
 
-
-:bckbld
-where bckbld >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion point back build
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd bckbld -out !_DirWork!\ServerDataDirectory\back_build.output.txt
-)
-
-:hdwbckbld
-where hdwbckbld >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion hardware back build
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd hdwbckbld -out !_DirWork!\ServerDataDirectory\hardware_back_build.output.txt
-)
-
-:hstdiag
-where hstdiag >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion history diagnostic
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :logCmd !_DirWork!\ServerDataDirectory\hstdiag.output.txt hstdiag
-)
-
-:embckbuilder
-where embckbuilder >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion embckbuilder output
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.alarmgroup.output.txt  -ALARMGROUP
-    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.asset.output.txt  -ASSET
-    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.network.output.txt  -NETWORK
-    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.system.output.txt  -SYSTEM
-)
-
-:fildmp
-where fildmp >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion System Flags Table output
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\sysflg.output.txt -FILENUM 8 -RECORDS 1 -FORMAT HEX
-	call :logitem Experion Area Asignmnt Table output
-    call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\areaasignmnt.output.txt -FILENUM 7 -RECORDS 1,1001 -FORMAT HEX
-)
-
-:OPCIntegrator
-if exist "%HwProgramData%\Experion PKS\Server\data\OPCIntegrator\" (
-	call :logitem Experion OPC Integrator
-	call :mkNewDir !_DirWork!\OPCIntegrator
-	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\OPCIntegrator\*.tsv" "!_DirWork!\OPCIntegrator\"
-)
-
-:listag
-where listag >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem listag output
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :logCmd !_DirWork!\ServerDataDirectory\listag.output.txt listag -ALL
-)
-
-:filfrag
 where filfrag >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem filfrag output
+	call :logitem . filfrag output
 	call :mkNewDir !_DirWork!\ServerDataDirectory
     call :logCmd !_DirWork!\ServerDataDirectory\filfrag.output.txt filfrag
 )
 
-:system.build
-if exist "%HwProgramData%\Experion PKS\Server\data\system.build" (
-	call :logitem copy system.build file
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\system.build" !_DirWork!\ServerDataDirectory\
-)
-
-:BadFiles
-if exist "%HwProgramData%\Experion PKS\Server\data\" (
-	call :logitem collect bad files .\server\data\*.bad
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\*.bad" !_DirWork!\ServerDataDirectory\
-)
-
-:TPNServer.log
-if exist "%HwProgramData%\TPNServer\TPNServer.log" (
-	call :logitem copy TPNServer.log file
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd copy /y "%HwProgramData%\TPNServer\TPNServer.log" !_DirWork!\ServerDataDirectory\
-)
-
-:mapping.tps.xml
 if exist "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" (
-	call :logitem copy .\mapping\tps.xml
+	call :logitem . copy .\mapping\tps.xml
 	call :mkNewDir !_DirWork!\ServerDataDirectory
 	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" !_DirWork!\ServerDataDirectory\mapping.tps.xml
 )
 
-:dsasublist
 where dsasublist >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem dsasublist
+	call :logitem . dsasublist
 	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :InitLog !_DirWork!\ServerDataDirectory\dsasublist.txt
     call :logCmd !_DirWork!\ServerDataDirectory\dsasublist.txt dsasublist
 )
 
-:winsxs
-	call :logitem list C:\Windows\winsxs\
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :logCmd !_DirWork!\ServerDataDirectory\winsxs.txt dir %windir%\winsxs
+(::CrashDumps - file list & reg settings
+call :logitem . create crash dumps list
+call :mkNewDir !_DirWork!\CrashDumps
+call :InitLog !_DirWork!\CrashDumps\CrashDumpsList.txt
+call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir %windir%\memory.dmp
+call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d %windir%\Minidump
+call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
+call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
+call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
+call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir  /o-d /s c:\users\*.dmp
 
-:liclist
-where liclist >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion license list - liclist
-	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :InitLog !_DirWork!\ServerRunDirectory\liclist.output.txt
-    call :logCmd !_DirWork!\ServerRunDirectory\liclist.output.txt liclist
+call :logitem . crash control registry settings
+set _RegFile=!_DirWork!\CrashDumps\RegCrashControl.txt
+call :InitLog !_RegFile!
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\CrashControl" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AeDebug" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows\Windows Error Reporting\LocalDumps" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options" /s
+
+call :logitem . Recover OS settings
+call :DoCmd  wmic /output:!_DirWork!\CrashDumps\recoveros.txt RECOVEROS
 )
 
-:hwlictool
-where hwlictool >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem Experion license list - hwlictool
-	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :InitLog !_DirWork!\ServerRunDirectory\hwlictool.output.txt
-    call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool export -format:xml
-)
+goto :eof
+:endregion ExperionAddData
 
-:usrlrn
-where usrlrn >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem usrlrn usrlrn -p -a
-	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :InitLog !_DirWork!\ServerRunDirectory\usrlrn.txt
-    call :logCmd !_DirWork!\ServerRunDirectory\usrlrn.txt usrlrn -p -a
-)
-
-:WhatOutput
-where what >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem What - Getting Experion exe/dll and source file information
-	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :InitLog !_DirWork!\ServerRunDirectory\what.output.txt
-	for /r "%HwInstallPath%\Experion PKS\Server\run" %%a in (*.exe *.dll) do what "%%a" >>!_DirWork!\ServerRunDirectory\what.output.txt
-)
-
-:CrashDumps
-	call :logitem create crash dumps list
-	call :mkNewDir !_DirWork!\CrashDumps
-	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir %windir%\memory.dmp
-	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d %windir%\Minidump
-	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
-	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
-	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
-	call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir  /o-d /s c:\users\*.dmp
-
-	call :logitem crash control registry settings
-	set _RegFile=!_DirWork!\CrashDumps\RegCrashControl.txt
-	call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\CrashControl" /s
-	call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug" /s
-	call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AeDebug" /s
-	call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows\Windows Error Reporting\LocalDumps" /s
-	call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /s
-	call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options" /s
-
-	call :logitem Recover OS settings
-	call :DoCmd  wmic /output:!_DirWork!\CrashDumps\recoveros.txt RECOVEROS
-
-:MSSQL
+:region SQL queries
+:SqlAddData
 where sqlcmd >NUL 2>&1
 if %errorlevel% NEQ 0 (
 	call :logOnlyItem no sqlcmd utility - skip sql queries
-	goto :NoMSSQL
+	goto :eof
 )
-	call :logitem *** query MS SQL ***
+	call :logitem * query MS SQL *
 	call :mkNewDir !_DirWork!\MSSQL-Logs
 	call :logitem select count^(*^) from NON_ERDB_POINTS_PARAMS
 	set _SqlFile=!_DirWork!\MSSQL-Logs\erdb.p2p.txt
@@ -908,7 +948,7 @@ if %errorlevel% NEQ 0 (
 	call :logitem EXEC sp_who2
 	call :DoSqlCmd "master" "EXEC sp_who2"
 
-:emsqueries
+::emsqueries
 	call :mkNewDir !_DirWork!\MSSQL-Logs
 	call :logitem emsevents sql queries
 	set _SqlFile=!_DirWork!\MSSQL-Logs\emsqueries.output.txt
@@ -945,7 +985,7 @@ if %errorlevel% NEQ 0 (
 	call :DoSqlCmd EMSEvents "SELECT * FROM msdb.dbo.sysjobhistory"
 	call :DoSqlCmd EMSEvents "SELECT * FROM EMSEvents.dbo.EventDelivery"
 
-:CheckSQLDBLogs
+::CheckSQLDBLogs
 	call :mkNewDir !_DirWork!\MSSQL-Logs
 	call :logitem Check SQL DB Logs
 	set _SqlFile=!_DirWork!\MSSQL-Logs\CheckSQLDBLogs.txt
@@ -954,11 +994,32 @@ if %errorlevel% NEQ 0 (
 	call :DoSqlCmd master "DBCC SQLPERF(LOGSPACE)"
 	call :DoSqlCmd master "select name AS 'Database name',log_reuse_wait_desc AS 'Log  Reuse' from sys.databases"
 
-:NoMSSQL
+goto :eof
+:endregion
 
+:: end additional data collection
+:endregion
+
+(:getPerformanceLogs
+	if /i "!_NoBlg!" EQU "1" goto :eof -- exit function
+	call :logitem get Experion Performance Logs
+	if not defined HWPERFLOGPATH set HWPERFLOGPATH=%HwProgramData%\Experion PKS\Perfmon
+	if Not Exist "%HWPERFLOGPATH%" (
+		call :logOnlyItem perfmon folder Not Exist "%HWPERFLOGPATH%"
+		goto :eof
+	)
+	call :mkNewDir !_DirWork!\Perfmon Logs
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci $env:HWPERFLOGPATH -filt *.blg | where{$_.LastWriteTime -gt (get-date).AddDays(-10)} | foreach{copy $_.fullName -dest '!_DirWork!\Perfmon Logs\'; sleep 1} }}
+	if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy blg files with PowerShell'. )
+	if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy blg files with PowerShell' failed.)
+	goto :eof
+)
+
+
+:region compress data
+:compress
 if defined _noCabZip goto :off_nocab
 
-:COMPRESS
 @rem check for makecab.exe
 for %%i in (makecab.exe) do (set exe=%%~$PATH:i)
 if "!exe!" equ "" (
@@ -966,7 +1027,7 @@ if "!exe!" equ "" (
     @echo.WARNING: makecab.exe not found. Proceeding as if 'nocab' was specified.
     goto :off_nocab )
 
-@rem construct cab directive file
+@rem construct cab directive file ::
 set cabName=%_Comp_Time%.cab
 
 :: ## remove space and comma in cab name
@@ -996,7 +1057,7 @@ if !_PSVer! LEQ 2 (
 			set _DoCleanup=0
 			echo. _DoCleanup: !_DoCleanup!
 			goto :off_nocab
-			@exit /b 1)
+			)
 )
 
 @echo.
@@ -1006,29 +1067,28 @@ call :showlogitem  ***  %_DirScript%!cabName!
 call :WriteHost white black *** [Note] Please upload data %_DirScript%!cabName! onto given GTAC workspace.
 call :play_attention_sound
 
-goto :end
+goto :eof
 
 
-@rem nocab or cab failure: print working directory location
+@rem nocab or cab failure: print working directory location ::
 :off_nocab
 @echo.
 @echo.
-@echo. Diagnostic data have NOT been compressed!
+@echo. Diagnostic data have NOT been compressed!!
 @echo. Data located in: %_DirWork%
-call :WriteHost white black *** Please compress all files in %_DirWork% and upload zip file to GTAC ftp site
+call :WriteHost white black *** [Note] Please compress all files in %_DirWork% and upload zip file to GTAC ftp site
 call :play_attention_sound
+
+exit /b 1 -- no cab, end compress
+:endregion
 
 :: Info:
 :: 	- v1.xx see Revision History in SCN file
 ::  - v1.05 Add NltestDomInfo; mkCab
-
+::  - v1.06 delete working files, if compressed
 
 :: ToDo:
-:: - [] Delete source files, if compressed
 
-:: - [] lisscn - change
-::    lisscn -chn n -all_ref > lisscn_all.txt
-::    lisscn -chn n > lisscn.txt
 
 :: - [] McAfee - check reg key before
 ::    reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
@@ -1044,22 +1104,12 @@ call :play_attention_sound
 ::		call :GetReg QUERY "HKLM\Software\Microsoft\Rpc" /s
 ::		call :GetReg QUERY "HKLM\Software\Microsoft\OLE" /s
 ::	)
-::	if /i "%~1" equ "Tcp" 	(
-::		call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /v ArpRetryCount
-::		call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /s
-::		call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\Tcpip6\Parameters" /s
-::		call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\tcpipreg" /s
-::		call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\iphlpsvc" /s
-::		call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002bE10318}" /s
-::	)
 
-:: - [x] get WindowsUpdate.log
-::		"C:\Windows\WindowsUpdate.log"
-::			Windows Update logs are now generated using ETW (Event Tracing for Windows).
-::			Please run the Get-WindowsUpdateLog PowerShell command to convert ETW traces into a readable WindowsUpdate.log.
-::
-::			For more information, please visit http://go.microsoft.com/fwlink/?LinkId=518345
-
+:: - [x] Delete source files, if compressed
+:: - [x] lisscn - change
+::    lisscn -chn n -all_ref > lisscn_all.txt
+::    lisscn -chn n > lisscn.txt
+:: - [x] get WindowsUpdate.log & ETL files
 :: - [x] Reg query power settings -> Turn off fast startup (/v HiberbootEnabled)
 ::		reg query "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /s
 :: - [x] Add cabzip input parameter
@@ -1068,9 +1118,3 @@ call :play_attention_sound
 :: - [x] Add usrlrn output
 :: - [x] xcopy command fixes
 :: - [x] fix mkCab
-
-
-:END
-call :logitem done.
-endlocal
-@echo.&goto:eof
