@@ -1,21 +1,39 @@
-# mDCT
-mDCT Windows CMD based Data Collection Script toolset v`2019.04.07
-### Quick Overview of Data Collection Script mDCT.cmd
+# mDCT++
+mDCT++ : Windows CMD based Data Collection Script toolset v.`2019.04.18`
+### Quick Overview of Data Collection Script mDCT++.cmd
 Purpose: Multi-purpose Troubleshooting tool to simplify just-in-time rapid data collection for standard and sporadic issues in in complex Experion environments or collecting data when standard DCT tool have problems.
 
 Please start the script in the C:\temp (or any other folder path without spaces) folder in **elevated CMD window**.
 
-For help, just run: `mdct /help`
+For help, just run: `mDCT++ /help`
 
-` C:\temp>dct [parameter list] `
-Please invoke the mDCT command with necessary/appropriate parameters from here.
-``` Usage example: mDCT - mini DCT +ext batch script file  (krasimir.kumanov@gmail.com)
-                mDCT all - run all data collection commamds
-                mDCT noblg - skip Experion Performance counters (*.blg) collection
-mDCT updates on: https://github.com/
- --> see 'mDCT /help' for more detailed help info
- --> Looking for help on specific keywords? Try: mDCT /help |findstr /i /c:noblg
+` C:\temp>mDCT++ [parameter list] `
+Please invoke the mDCT++ command with necessary/appropriate parameters from here.
 ```
+Parameters:
+  noDctData - skip collection of DCT data
+  noPerfMon - skip Performance Counter colection - *.blg files
+  noAddData - skip colection of the addtional diagnostic data
+  noCabZip  - the data collected will not be compressed
+
+Usage examples:
+ Example 1 - collect all data and create archive - default run without parameters
+ c:\Temp\> mDCT++.cmd
+
+ Example 2 - Do not collect Perfromance counters
+ c:\Temp\> mDCT++.cmd  noPerfMon
+
+ Example 3 - No additional data - only DCT data, PerfMon logs and crash dump list
+ c:\Temp\> mDCT++.cmd  noAddData
+
+ Example 4 - small DCT data collection - no PerMOn Logs, no addtional data
+ c:\Temp\> mDCT++.cmd  noPerfMon  noAddData
+
+ Example 5 - collect only extended diagnostic data
+ c:\Temp\> mDCT++.cmd  noDctData noPerfMon
+```
+** mDCT++ updates and more details on: https://github.com/kumanov/mDCT
+
 ## Extended diagnostic data Collection
 - Windows general
   - Enviroment variables output
@@ -32,7 +50,15 @@ mDCT updates on: https://github.com/
   - WMI root:/ security descriptor
   - Scheduled tasks query output
   - NlTestDomInfo
-  - reg query Policies Windows Defender
+  - registry query
+    - HKLM\Software\Policies\Microsoft\Windows Defender
+    - HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC
+    - HKLM\Software\Microsoft\RPC
+    - HKLM\Software\Microsoft\OLE
+  - Windows Time status/settings
+    - w32tm /query /configuration /verbose
+    - w32tm /query /configuration
+    - HKLM\SYSTEM\CurrentControlSet\Services\W32Time
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -57,6 +83,8 @@ mDCT updates on: https://github.com/
     - net use
     - net statistics workstation
     - net statistics server
+  - wmic nic get
+  - wmic nicconfig get
 - Crash Dumps
   - crash dump files list
   - Recover OS settings
@@ -69,6 +97,9 @@ mDCT updates on: https://github.com/
 - Experion
   - dsasublist output
   - filfrag output
-  - listag output
   - lisscn output
   - mapping tps.xml
+  - dual_status
+  - cstn_status
+  - ps output
+  - shheap 1 check output

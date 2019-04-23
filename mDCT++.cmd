@@ -11,10 +11,17 @@ setlocal enableDelayedExpansion
 ::  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ::  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+:: handle /?
+if "%~1"=="/?" (
+	call :usage
+	exit /b 0
+)
+
 set _DirScript=%~dp0
 call :preRequisites
-if "%errorlevel%" neq "0" goto :eof
+if "%errorlevel%" NEQ "0" goto :eof
 call :Initialize %*
+if /i "%_Usage%" EQU "1" ( goto :eof )
 call :CollectDctData
 call :getPerformanceLogs
 call :CollectAdditionalData
@@ -46,8 +53,13 @@ echo.done.
 		call :WriteHostNoLog green black Success: no spaces in script full path
 	)
 	
-	::TODO - user account membership : "Product Administrators" or "Local Engineers"
-	:: whoami /groups | findstr /irc:"Product Administrators" /c:"Local Engineers"
+	:: user account membership : "Product Administrators" , "Local Engineers" , test
+	whoami /all | findstr /irc:"Product Administrators" /c:"Local Engineers" /c:E402276 >NUL 2>&1
+	if "%errorlevel%" NEQ "0" (
+		call :WriteHostNoLog yellow black  *** User Account Membership `nUser account should be member on `'Product Administrators`' or `'Local Engineers`' `nPlease use user account member on the above groups
+		::call :WriteHostNoLog yellow black  Please use user account member on the above groups
+		exit /b 1
+	)
 
 	goto :eof
 :endregion
@@ -55,7 +67,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.06
+set _ScriptVersion=v1.07
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-04-03
 
 :: change the cmd prompt environment to English
@@ -88,7 +100,7 @@ call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersio
 	@set _noDctData=
 	@set _noAddData=
 	@set _noCabZip=
-	@set _noBlg=
+	@set _noPerfMon=
 
 :: regional settings ^(choose EN-US, DE-DE^) for localized Perfmon counter names, hardcode to EN-US, or choose _GetLocale=1
 	@set _locale=EN-US
@@ -97,12 +109,6 @@ call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersio
 :endregion Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :region parse args
-:: handle /?
-if "%~1"=="/?" (
-	call :usage
-	exit /b 0
-)
-
 
 call:ArgsParse %*
 
@@ -163,7 +169,7 @@ goto :eof
 
 	IF /i "%~1"=="noDctData" set _NoDctData=1
 	IF /i "%~1"=="noAddData" set _NoAddData=1
-	IF /i "%~1"=="noBlg" set _NoBlg=1
+	IF /i "%~1"=="noPerfMon" set _noPerfMon=1
 	if /i "%~1"=="noCabZip" (set _noCabZip=1)
 
 	SHIFT
@@ -246,14 +252,31 @@ goto :eof
 
 :usage
 @echo.
-@echo. Usage example: %~n0 - mini DCT +ext batch script file  (krasimir.kumanov@gmail.com)
-@echo.                %~n0 all - run all data collection commamds
-@echo.                %~n0 noBlg - skip Experion Performance counters (*.blg) collection
-@echo.                %~n0 noCabZip - You can use param noCabZip to suppress data compresssion at end stage
+@echo.mini Data Collection Tool script ++ extensions
+@echo.The script will colect DCT data (not all), PerfMon Logs (last 10 days), list of crash dumps (only list, no dmp files) and additional diagnostic data
+@echo.The data will be archived in .cab or .zip file with name [hostName]_[Date]_[Time].cab/zip and working files will be deleted
+@echo.This is default behaviour when running without paramaters. To change it you can run script with any of below parameters
+@echo.  noDctData - skip collection of DCT data 
+@echo.  noPerfMon - skip Performance Counter colection - *.blg files 
+@echo.  noAddData - skip colection of the addtional diagnostic data
+@echo.  noCabZip  - the data collected will not be compressed
+@echo.Usage examples:
+@echo. Example 1 - collect all data and create archive - default run without parameters
+@echo. c:\Temp\^> %~nx0
 @echo.
-@echo. mDCT++ updates on: https://github.com/kumanov/mDCT
-@echo. -^> see '%~n0 /help' for more detailed help info
-@echo. -^> Looking for help on specific keywords^? Try: mDCT++ /help ^|findstr /i /c:noBlg
+@echo. Example 2 - Do not collect Perfromance counters
+@echo. c:\Temp\^> %~nx0  noPerfMon
+@echo.
+@echo. Example 3 - No additional data - only DCT data, PerfMon logs and crash dump list
+@echo. c:\Temp\^> %~nx0  noAddData
+@echo.
+@echo. Example 4 - small DCT data collection - no PerMOn Logs, no addtional data
+@echo. c:\Temp\^> %~nx0  noPerfMon  noAddData
+@echo.
+@echo. Example 5 - collect only extended diagnostic data
+@echo. c:\Temp\^> %~nx0  noDctData noPerfMon
+@echo.
+@echo.** mDCT++ updates, more details and list of extended data collected on: https://github.com/kumanov/mDCT
 @goto :eof
 
 :InitLog [LogFileName]
@@ -476,6 +499,9 @@ call :doCmd copy /y %windir%\System32\drivers\etc\hosts !_DirWork!\GeneralSystem
 call :logitem ipconfig output
 call :LogCmd !_DirWork!\GeneralSystemInfo\ipconfig.txt ipconfig /all
 
+call :logitem netsh firewall show config
+call :LogCmd !_DirWork!\GeneralSystemInfo\firewall.txt netsh firewall show config
+
 call :logitem get time zone information
 call :doCmd wmic /output:!_DirWork!\GeneralSystemInfo\timezone.output.txt timezone get Bias, Description, StandardName
 
@@ -557,6 +583,9 @@ if %errorlevel%==0 (
 	call :mkNewDir !_DirWork!\ServerDataDirectory
 	call :LogCmd !_DirWork!\ServerDataDirectory\almdmp.output.txt almdmp A 32000 S
 	call :LogCmd !_DirWork!\ServerDataDirectory\eventdmp.output.txt almdmp E 32000 S
+	call :LogCmd !_DirWork!\ServerDataDirectory\msgdmp.output.txt almdmp M 32000 S
+	call :LogCmd !_DirWork!\ServerDataDirectory\alertdmp.output.txt almdmp T 32000 S
+	call :LogCmd !_DirWork!\ServerDataDirectory\soedmp.output.txt almdmp S 32000 S
 )
 
 where shheap >NUL 2>&1
@@ -764,10 +793,32 @@ secedit /export /cfg !_SecurityFile! >> !_LogFile!
 call :logitem . query drivers information
 call :LogCmd !_DirWork!\GeneralSystemInfo\driverquery.output.csv driverquery /fo csv /v
 
-:: reg query Policies Windows Defender
 call :logOnlyItem . reg query Policies Windows Defender
 set _RegFile=!_DirWork!\GeneralSystemInfo\PoliciesWindowsDefender.txt
+call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
+
+call :logOnlyItem . reg query RPC settings
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile=!_DirWork!\RegistryInfo\RPC_registry_settings.txt
+call :InitLog !_RegFile!
+call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC" /s
+call :GetReg QUERY "HKLM\Software\Microsoft\Rpc" /s
+
+call :logOnlyItem . reg query Microsoft\OLE
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile=!_DirWork!\RegistryInfo\OLE_registry_settings.txt
+call :InitLog !_RegFile!
+call :GetReg QUERY "HKLM\Software\Microsoft\OLE" /s
+
+call :logOnlyItem . Windows Time status/settings
+set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\WindowsTime.txt
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :InitLog !_WindowsTimeFile!
+call :LogCmd !_WindowsTimeFile! w32tm /query /status /verbose
+call :LogCmd !_WindowsTimeFile! w32tm /query /configuration
+set _RegFile=!_WindowsTimeFile!
+call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s
 
 
 goto :eof
@@ -781,7 +832,7 @@ call :logitem * Network configuration data *
 call :mkNewDir !_DirWork!\Network
 
 call :logitem . netstat connections
-set _NetStatFile=!_DirWork!\GeneralSystemInfo\netstat-nato.txt
+set _NetStatFile=!_DirWork!\Network\netstat-nato.txt
 call :InitLog !_NetStatFile!
 call :LogCmd !_NetStatFile! netstat -nato
 
@@ -793,7 +844,7 @@ call :LogCmd !_DirWork!\Network\ipconfig.displaydns.txt ipconfig /displaydns
 
 :NetSh_ConfigAndStats
 call :logitem . netsh config/stats
-set _NetShFile=!_DirWork!\GeneralSystemInfo\netsh.output.txt
+set _NetShFile=!_DirWork!\Network\netsh.output.txt
 call :InitLog !_NetShFile!
 call :LogCmd !_NetShFile! netsh interface ipv4 show ipstats
 call :LogCmd !_NetShFile! netsh interface ipv4 show tcpstats
@@ -859,6 +910,12 @@ call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\tcpipreg" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\iphlpsvc" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002bE10318}" /s
 
+call :logitem . wmic nic/nicconfig get
+call :InitLog !_DirWork!\Network\nicconfig.txt
+call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nic get >NUL
+call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nicconfig get Description,DHCPEnabled,Index,InterfaceIndex,IPEnabled,MACAddress >NUL
+call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nicconfig get >NUL
+
 goto :eof
 :endregion NetworkAddData
 
@@ -918,6 +975,30 @@ call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File
 
 call :logitem . Recover OS settings
 call :DoCmd  wmic /output:!_DirWork!\CrashDumps\recoveros.txt RECOVEROS
+)
+
+where dual_status >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem . get server dual status
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog !_DirWork!\ServerRunDirectory\dual_status.output.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\dual_status.output.txt dual_status
+)
+
+where cstn_status >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem . get console station status
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog !_DirWork!\ServerRunDirectory\cstn_status.output.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\cstn_status.output.txt cstn_status
+)
+
+where ps >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem . ps output
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog !_DirWork!\ServerRunDirectory\ps.output.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\ps.output.txt ps
 )
 
 goto :eof
@@ -1001,7 +1082,7 @@ goto :eof
 :endregion
 
 (:getPerformanceLogs
-	if /i "!_NoBlg!" EQU "1" goto :eof -- exit function
+	if /i "!_noPerfMon!" EQU "1" goto :eof -- exit function
 	call :logitem get Experion Performance Logs
 	if not defined HWPERFLOGPATH set HWPERFLOGPATH=%HwProgramData%\Experion PKS\Perfmon
 	if Not Exist "%HWPERFLOGPATH%" (
@@ -1086,25 +1167,31 @@ exit /b 1 -- no cab, end compress
 :: 	- v1.xx see Revision History in SCN file
 ::  - v1.05 Add NltestDomInfo; mkCab
 ::  - v1.06 delete working files, if compressed
+::  - v1.07 updates, fixes, ++ data
 
 :: ToDo:
-
 
 :: - [] McAfee - check reg key before
 ::    reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
 ::    if %ERRORLEVEL% EQU 0 goto :noMcAfeeScanner
 
-:: - [] Collect DCOM & TCP settings
-::	if /i "%~1" equ "DCOM" 	(
-::		set _RegFile=!_PrefixT!Reg_%~1_%mode%.txt
-::		call :InitLog !_RegFile!
-::		call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\LSA" /s
-::		call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows NT\DCOM" /s
-::		call :GetReg QUERY "HKLM\Software\Microsoft\COM3" /s
-::		call :GetReg QUERY "HKLM\Software\Microsoft\Rpc" /s
-::		call :GetReg QUERY "HKLM\Software\Microsoft\OLE" /s
-::	)
+:: - [] Windows time
+::    w32tm /query /configuration /verbose
+::    w32tm /query /configuration
+::    reg query HKLM\SYSTEM\CurrentControlSet\Services\W32Time /s
 
+:: - [] Log and XML files from C:\Program Files\Honeywell\Experion PKS\Engineering Tools\temp\EMB.
+::    The XML files contain the last asset, alarm group and system models that were downloaded to the server from the Enterprise Model Builder.
+::    The log files contain any errors or warnings from these downloads
+
+:: - [x] console troubleshooting
+::If using the Windows firewall, dump its configuration on Server and Console Station:
+::	netsh firewall show config >firewall.txt	(Included in DCT for 310+)
+::A dump of the following registry key from the Server and Console Station:
+::	HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\RPC
+:: - [x] Use the cstn_status tool to determine the current state (on console station)
+:: - [x] wmic nicconfig get
+:: - [x] Collect DCOM & TCP registry settings
 :: - [x] Delete source files, if compressed
 :: - [x] lisscn - change
 ::    lisscn -chn n -all_ref > lisscn_all.txt
