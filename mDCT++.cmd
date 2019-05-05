@@ -19,9 +19,9 @@ if "%~1"=="/?" (
 
 set _DirScript=%~dp0
 call :preRequisites
-if "%errorlevel%" NEQ "0" goto :eof
+if /i "%errorlevel%" NEQ "0" (goto :eof)
 call :Initialize %*
-if /i "%_Usage%" EQU "1" ( goto :eof )
+if /i "!_Usage!" EQU "1" (goto :eof)
 call :CollectDctData
 call :getPerformanceLogs
 call :CollectAdditionalData
@@ -54,11 +54,13 @@ echo.done.
 	)
 	
 	:: user account membership : "Product Administrators" , "Local Engineers" , test
-	whoami /all | findstr /irc:"Product Administrators" /c:"Local Engineers" /c:E402276 >NUL 2>&1
+	whoami /all 2>NUL | findstr /irc:"Product Administrators" /c:"Local Engineers" /c:E402276 >NUL 2>&1
 	if "%errorlevel%" NEQ "0" (
 		call :WriteHostNoLog yellow black  *** User Account Membership `nUser account should be member on `'Product Administrators`' or `'Local Engineers`' `nPlease use user account member on the above groups
 		::call :WriteHostNoLog yellow black  Please use user account member on the above groups
 		exit /b 1
+	) else (
+		call :WriteHostNoLog green black Success: user account group membership
 	)
 
 	goto :eof
@@ -67,22 +69,21 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.07
-:: Last-Update by krasimir.kumanov@gmail.com: 2019-04-03
+set _ScriptVersion=v1.08
+:: Last-Update by krasimir.kumanov@gmail.com: 2019-05-05
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
 
 :: Adding a Window Title
-SET title=%~nx0 - version %_ScriptVersion%
-TITLE %title%
+SET _title=%~nx0 - version %_ScriptVersion%
+TITLE %_title% & set _title=
 
 if defined _DbgOut ( echo. %time% _DirScript: %_DirScript% )
 
 :: Change Directory to the location of the batch script file (%0)
 CD /d "%_DirScript%"
 @echo. .. starting '%_DirScript%%~n0 %*'
-
 
 ::@::if defined _DbgOut ( echo.%time% : Start of mDCT++ ^(%_ScriptVersion% - krasimir.kumanov@gmail.com^))
 call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersion% - krasimir.kumanov@gmail.com]
@@ -105,7 +106,10 @@ call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersio
 :: regional settings ^(choose EN-US, DE-DE^) for localized Perfmon counter names, hardcode to EN-US, or choose _GetLocale=1
 	@set _locale=EN-US
 	@set _GetLocale=
-		
+
+:: VEP
+	@set _VEP=
+
 :endregion Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :region parse args
@@ -143,6 +147,10 @@ wmic process where name="cmd.exe" CALL setpriority "idle"  >NUL 2>&1
 
 call :WriteHostNoLog blue black *** %_ScriptVersion% Dont click inside the script window while processing as it will cause the script to pause. ***
 
+:: VEP detect
+wmic path win32_computersystem get Manufacturer /value | findstr /ic:"VMware" >NUL 2>&1
+if "%errorlevel%"=="0" (set _VEP=1)
+
 if defined _GetLocale ( call :getLocale _locale )
 
 call :logOnlyItem  mDCT++ (krasimir.kumanov@gmail.com) -%_ScriptVersion% start invocation: '%_DirScript%%~n0 %*'
@@ -154,24 +162,32 @@ goto :eof
 
 :region functions
 :ArgsParse
-	:: count number of arguments
-	set _argCount=0
-	for %%x in (%*) do ( set /A _argCount+=1 )
-
 	:: end parse, if no more args
 	IF "%~1"=="" exit /b
 
-	IF "%~1"=="-?" set _Usage=1
+	set _KnownArg=0
+
+	IF "%~1"=="-?" (set _Usage=1& exit /b)
 
 	for %%i in (help /help -help -h /h) do (
-		if /i "%~1" equ "%%i" (set _Usage=1)
+		if /i "%~1" equ "%%i" (set _Usage=1& exit /b)
 	)
 
-	IF /i "%~1"=="noDctData" set _NoDctData=1
-	IF /i "%~1"=="noAddData" set _NoAddData=1
-	IF /i "%~1"=="noPerfMon" set _noPerfMon=1
-	if /i "%~1"=="noCabZip" (set _noCabZip=1)
+	IF /i "%~1"=="noDctData" (set _NoDctData=1
+		set _KnownArg=1)
+	IF /i "%~1"=="noAddData" (set _NoAddData=1
+		set _KnownArg=1)
+	IF /i "%~1"=="noPerfMon" (set _noPerfMon=1
+		set _KnownArg=1)
+	if /i "%~1"=="noCabZip"  (set _noCabZip=1
+		set _KnownArg=1)
 
+	if /i "!_KnownArg!"=="0" (
+		@echo.
+		call :WriteHostNoLog yellow black  *** Unknown input argument: "%~1"
+		set _Usage=1
+		exit /b 1)
+	
 	SHIFT
 	GOTO ArgsParse
 
@@ -200,9 +216,9 @@ goto :eof
 	for /f "tokens=2 delims=." %%o in ('echo %_OSVER%') do @set _OSVER2=%%o
 	for /f "tokens=3 delims=." %%o in ('echo %_OSVER%') do @set _OSVER3=%%o
 	for /f "tokens=4 delims=." %%o in ('echo %_OSVER%') do @set _OSVER4=%%o
-	for /f "tokens=4-8 delims=[.] " %%i in ('ver') do (if %%i==Version (set v=%%j.%%k.%%l.%%m) else (set v=%%i.%%j.%%k.%%l))
-	if defined _DbgOut ( echo. %time% ###getWinVer OS: %_OSVER1% %_OSVER2% %_OSVER3% %_OSVER4% Version %v% )
-	:: echo Windows Version: %v%
+	for /f "tokens=4-8 delims=[.] " %%i in ('ver') do (if %%i==Version (set _v=%%j.%%k.%%l.%%m) else (set _v=%%i.%%j.%%k.%%l))
+	if defined _DbgOut ( echo. %time% ###getWinVer OS: %_OSVER1% %_OSVER2% %_OSVER3% %_OSVER4% Version %_v% )
+	:: echo Windows Version: %_v%
 	:: 10.0 - Windows 10		10240 RTM, 10586 TH2 v1511, 14393 RS1 v1607, 15063 RS2 v1703, 16299 RS3 1709, 17134 RS4 1803, 17692 RS5 1809
 	::  6.3 - Windows 8.1 and Windows Server 2012R2 9600
 	::  6.2 - Windows 8			9200
@@ -212,7 +228,6 @@ goto :eof
 	::  5.1 - Windows XP		2600
 	::  5.0 - Windows 2000		2195
 	::  4.10 -Windows 98
-	@exit /b
 	@goto :eof
 
 :getDateTime - UTILITY to get current Date and Time on localized OS
@@ -282,7 +297,7 @@ goto :eof
 :InitLog [LogFileName]
 	@if not exist %~1 (
 		@echo.%date% %time% . INITIALIZE file %~1 by %USERNAME% on %COMPUTERNAME% in Domain %USERDOMAIN% > "%~1"
-		@echo.mDCT++ [%_ScriptVersion%] 'krasimir.kumanov@gmail.com' >> "%~1"
+		@echo.mDCT++ [%_ScriptVersion%] ^(krasimir.kumanov@gmail.com^)^, link: https://github.com/kumanov/mDCT >> "%~1"
 		@echo.>> "%~1"
 	)
 	@goto :eof
@@ -520,14 +535,17 @@ call :logitem query services
 call :DoGetSVC %time%
 
 (call :logitem export Experion registry settings
-call :mkNewDir  !_DirWork!\RegistryInfo
-call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_CURRENT_USER\Software\Honeywell !_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt
-call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt
-call :doCmd %windir%\SysWOW64\reg.exe EXPORT HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Microsoft_Uninstall.txt
+call :mkNewDir  "!_DirWork!\RegistryInfo"
+if exist %windir%\SysWOW64\regedit.exe (set _regedit="%windir%\SysWOW64\regedit.exe") else (set _regedit=regedit.exe)
+call :doCmd !_regedit! /E !_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt "HKEY_CURRENT_USER\Software\Honeywell"
+call :doCmd !_regedit! /E !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt "HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell"
+call :doCmd !_regedit! /E !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Microsoft_Uninstall.txt "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
 )
 
 call :logitem get FTE logs
-call :doCmd xcopy /s/e/i/q/y/H "%HwProgramData%\ProductConfig\FTE\*.log" "!_DirWork!\FTELogs\"
+::@::call :doCmd xcopy /s/e/i/q/y/H "%HwProgramData%\ProductConfig\FTE\*.log" "!_DirWork!\FTELogs\"
+call :mkNewDir  "!_DirWork!\FTELogs"
+for /r "%HwProgramData%\ProductConfig\FTE" %%g in (*.log) do (type %%g >"!_DirWork!\FTELogs\%%~ng%%~xg")
 
 call :logitem get HMIWeb log files
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station-logs\"
@@ -730,25 +748,30 @@ call :logitem * Windows data *
 
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 
+call :logitem . SystemInfo.exe output
+call :InitLog !_DirWork!\GeneralSystemInfo\_SystemInfo.txt
+call :LogCmd !_DirWork!\GeneralSystemInfo\_SystemInfo.txt systeminfo.exe
+
 call :logitem . whoami - currently logged in user
-call :InitLog !_DirWork!\GeneralSystemInfo\whoami.txt
-call :LogCmd !_DirWork!\GeneralSystemInfo\whoami.txt whoami /all
-
-call :logitem . scheduled task - query
-schtasks /query /xml ONE >!_DirWork!\GeneralSystemInfo\scheduled_tasks.xml
-
-call :logitem . collecting GPResult output
-set _GPresultFile=!_DirWork!\GeneralSystemInfo\GPresult.htm
-call :doCmd gpresult /h !_GPresultFile! /f
+call :InitLog !_DirWork!\GeneralSystemInfo\_whoami.txt
+call :LogCmd !_DirWork!\GeneralSystemInfo\_whoami.txt whoami /all
 
 call :logitem . Windows Environment Variables
-call :InitLog !_DirWork!\GeneralSystemInfo\EnvVariables.txt
-call :LogCmd !_DirWork!\GeneralSystemInfo\EnvVariables.txt set
+call :InitLog !_DirWork!\GeneralSystemInfo\_EnvVariables.txt
+call :LogCmd !_DirWork!\GeneralSystemInfo\_EnvVariables.txt set
+
+call :logitem . scheduled task - query
+schtasks /query /xml ONE >!_DirWork!\GeneralSystemInfo\_scheduled_tasks.xml
+call :SleepX 1
+
+call :logitem . collecting GPResult output
+set _GPresultFile=!_DirWork!\GeneralSystemInfo\_GPresult.htm
+call :doCmd gpresult /h !_GPresultFile! /f
 
 call :DoNltestDomInfo %time%
 
 call :logitem . get power configuration settings
-set _powerCfgFile=!_DirWork!\GeneralSystemInfo\powercfg.txt
+set _powerCfgFile=!_DirWork!\GeneralSystemInfo\_powercfg.txt
 call :InitLog !_powerCfgFile!
 call :LogCmd !_powerCfgFile! powercfg -Q
 :: reg query power settings
@@ -757,12 +780,8 @@ set _RegFile=!_powerCfgFile!
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"  /s /t reg_dword
 ::  fast reboot - "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled
 
-call :logitem . SystemInfo.exe output
-call :InitLog !_DirWork!\GeneralSystemInfo\SystemInfo.txt
-call :LogCmd !_DirWork!\GeneralSystemInfo\SystemInfo.txt systeminfo.exe
-
 call :logitem . collecting Quick Fix Engineering information (Hotfixes)
-call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\Hotfixes.txt qfe list
+call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_Hotfixes.txt qfe list
 
 if exist "%windir%\Honeywell_MsPatches.txt" (
 	call :logitem get Honeywell_MsPatches.txt
@@ -785,34 +804,35 @@ call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\WmiRootSecurityDescriptor
 :: AV on accesss scanner settings
 call :doCmd REG EXPORT "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\HKLM_McAfee_OnAccessScanner.txt
 
-set _SecurityFile=!_DirWork!\GeneralSystemInfo\SecurityCfg.txt
+set _SecurityFile=!_DirWork!\GeneralSystemInfo\_SecurityCfg.txt
 call :InitLog !_SecurityFile!
 call :logitem . secedit /export /cfg "!_SecurityFile!"
 secedit /export /cfg !_SecurityFile! >> !_LogFile!
+call :SleepX 1
 
 call :logitem . query drivers information
-call :LogCmd !_DirWork!\GeneralSystemInfo\driverquery.output.csv driverquery /fo csv /v
+call :LogCmd !_DirWork!\GeneralSystemInfo\_driverquery.output.csv driverquery /fo csv /v
 
 call :logOnlyItem . reg query Policies Windows Defender
-set _RegFile=!_DirWork!\GeneralSystemInfo\PoliciesWindowsDefender.txt
+set _RegFile=!_DirWork!\GeneralSystemInfo\_PoliciesWindowsDefender.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
 
 call :logOnlyItem . reg query RPC settings
 call :mkNewDir  !_DirWork!\RegistryInfo
-set _RegFile=!_DirWork!\RegistryInfo\RPC_registry_settings.txt
+set _RegFile=!_DirWork!\RegistryInfo\_RPC_registry_settings.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC" /s
 call :GetReg QUERY "HKLM\Software\Microsoft\Rpc" /s
 
 call :logOnlyItem . reg query Microsoft\OLE
 call :mkNewDir  !_DirWork!\RegistryInfo
-set _RegFile=!_DirWork!\RegistryInfo\OLE_registry_settings.txt
+set _RegFile=!_DirWork!\RegistryInfo\_OLE_registry_settings.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\Software\Microsoft\OLE" /s
 
 call :logOnlyItem . Windows Time status/settings
-set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\WindowsTime.txt
+set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :InitLog !_WindowsTimeFile!
 call :LogCmd !_WindowsTimeFile! w32tm /query /status /verbose
@@ -820,6 +840,17 @@ call :LogCmd !_WindowsTimeFile! w32tm /query /configuration
 set _RegFile=!_WindowsTimeFile!
 call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s
 
+(:: temperature
+if not "%_VEP%"=="1" (
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo
+	set _ThermalZoneTemperature=!_DirWork!\GeneralSystemInfo\ThermalZoneTemperature.txt
+	call :InitLog !_ThermalZoneTemperature!
+	@echo Temperature at thermal zone in tenths of degrees Kelvin >>!_ThermalZoneTemperature!
+	@echo Convert to Celsius: xxx / 10 - 273.15 >>!_ThermalZoneTemperature!
+	@echo.>>!_ThermalZoneTemperature!
+	wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature | more /s >>!_ThermalZoneTemperature!
+)
+)
 
 goto :eof
 :endregion Windows
@@ -846,11 +877,11 @@ call :LogCmd !_DirWork!\Network\ipconfig.displaydns.txt ipconfig /displaydns
 call :logitem . netsh config/stats
 set _NetShFile=!_DirWork!\Network\netsh.output.txt
 call :InitLog !_NetShFile!
-call :LogCmd !_NetShFile! netsh interface ipv4 show ipstats
-call :LogCmd !_NetShFile! netsh interface ipv4 show tcpstats
 call :LogCmd !_NetShFile! netsh int ipv4 show dynamicport tcp
 call :LogCmd !_NetShFile! netsh int tcp show global
 call :LogCmd !_NetShFile! netsh int ipv4 show offload
+call :LogCmd !_NetShFile! netsh interface ipv4 show ipstats
+call :LogCmd !_NetShFile! netsh interface ipv4 show tcpstats
 
 :nslookup
 call :logitem . nslookup
@@ -916,6 +947,25 @@ call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nic get >NUL
 call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nicconfig get Description,DHCPEnabled,Index,InterfaceIndex,IPEnabled,MACAddress >NUL
 call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nicconfig get >NUL
 
+call :logitem . msft_providers get Provider,HostProcessIdentifier 
+call :InitLog !_DirWork!\Network\nicconfig.txt
+call :doCmd  wmic /append:!_DirWork!\Network\msft_providers.txt path msft_providers get Provider,HostProcessIdentifier >NUL
+
+
+if exist "c:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe" (
+	set _vmtbcmd="C:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe"
+	call :logOnlyItem . VMWare status
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo
+	set _vmStatLog=!_DirWork!\GeneralSystemInfo\VMware.stat.txt
+	call :InitLog !_vmStatLog!
+	call :LogCmd !_vmStatLog! !_vmtbcmd!  upgrade status
+	call :LogCmd !_vmStatLog! !_vmtbcmd!  timesync status
+	:: vSphere API/SDK Documentation - vSphere Guest and HA Application Monitoring SDK Documentation - Guest and HA Application Monitoring SDK Programming Guide - Tools for Extended Guest Statistics - Metrics Examples
+	for /f "tokens=*" %%g in ('!_vmtbcmd! stat raw') do (
+		call :logcmd !_vmStatLog! !_vmtbcmd! stat raw text %%g
+	)
+)
+
 goto :eof
 :endregion NetworkAddData
 
@@ -927,44 +977,46 @@ where lisscn >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem . lisscn output
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd lisscn -all_ref -OUT !_DirWork!\ServerDataDirectory\lisscn_all.txt
-	call :doCmd lisscn -OUT !_DirWork!\ServerDataDirectory\lisscn.txt
+	call :doCmd lisscn -all_ref -OUT !_DirWork!\ServerDataDirectory\_lisscn_all.txt
+	call :doCmd lisscn -OUT !_DirWork!\ServerDataDirectory\_lisscn.txt
 )
 
 where filfrag >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem . filfrag output
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :logCmd !_DirWork!\ServerDataDirectory\filfrag.output.txt filfrag
+	call :InitLog !_DirWork!\ServerDataDirectory\_filfrag.output.txt
+    call :logCmd !_DirWork!\ServerDataDirectory\_filfrag.output.txt filfrag
 )
 
 if exist "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" (
 	call :logitem . copy .\mapping\tps.xml
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" !_DirWork!\ServerDataDirectory\mapping.tps.xml
+	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" !_DirWork!\ServerDataDirectory\_mapping.tps.xml
 )
 
 where dsasublist >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem . dsasublist
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :InitLog !_DirWork!\ServerDataDirectory\dsasublist.txt
-    call :logCmd !_DirWork!\ServerDataDirectory\dsasublist.txt dsasublist
+	call :InitLog !_DirWork!\ServerDataDirectory\_dsasublist.txt
+    call :logCmd !_DirWork!\ServerDataDirectory\_dsasublist.txt dsasublist
 )
 
 (::CrashDumps - file list & reg settings
 call :logitem . create crash dumps list
 call :mkNewDir !_DirWork!\CrashDumps
-call :InitLog !_DirWork!\CrashDumps\CrashDumpsList.txt
-call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir %windir%\memory.dmp
-call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d %windir%\Minidump
-call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
-call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
-call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
-call :logCmd !_DirWork!\CrashDumps\CrashDumpsList.txt dir  /o-d /s c:\users\*.dmp
+set _CrashDumpsList=!_DirWork!\CrashDumps\_CrashDumpsList.txt
+call :InitLog !_CrashDumpsList!
+call :logCmd  !_CrashDumpsList! dir %windir%\memory.dmp
+call :logCmd  !_CrashDumpsList! dir /o:-d %windir%\Minidump
+call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
+call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
+call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
+call :logCmd  !_CrashDumpsList! dir  /o-d /s c:\users\*.dmp
 
 call :logitem . crash control registry settings
-set _RegFile=!_DirWork!\CrashDumps\RegCrashControl.txt
+set _RegFile=!_DirWork!\CrashDumps\_RegCrashControl.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\CrashControl" /s
 call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug" /s
@@ -981,24 +1033,37 @@ where dual_status >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem . get server dual status
 	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :InitLog !_DirWork!\ServerRunDirectory\dual_status.output.txt
-    call :logCmd !_DirWork!\ServerRunDirectory\dual_status.output.txt dual_status
+	call :InitLog !_DirWork!\ServerRunDirectory\_dual_status.output.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\_dual_status.output.txt dual_status
 )
 
 where cstn_status >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem . get console station status
 	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :InitLog !_DirWork!\ServerRunDirectory\cstn_status.output.txt
-    call :logCmd !_DirWork!\ServerRunDirectory\cstn_status.output.txt cstn_status
+	call :InitLog !_DirWork!\ServerRunDirectory\_cstn_status.output.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\_cstn_status.output.txt cstn_status
 )
 
 where ps >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem . ps output
 	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :InitLog !_DirWork!\ServerRunDirectory\ps.output.txt
-    call :logCmd !_DirWork!\ServerRunDirectory\ps.output.txt ps
+	call :InitLog !_DirWork!\ServerRunDirectory\_ps.output.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\_ps.output.txt ps
+)
+
+where shheap >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion shheap 1 check
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :InitLog !_DirWork!\ServerDataDirectory\_shheap.1.check.output.txt
+    call :logCmd !_DirWork!\ServerDataDirectory\_shheap.1.check.output.txt shheap 1 check
+)
+
+(call :logitem list disk resident heap files
+call :mkNewDir !_DirWork!\ServerDataDirectory
+call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\locks" "%HwProgramData%\Experion PKS\Server\data\dual_q" "%HwProgramData%\Experion PKS\Server\data\gda" "%HwProgramData%\Experion PKS\Server\data\tagcache" "%HwProgramData%\Experion PKS\Server\data\taskrequest" "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*"
 )
 
 goto :eof
@@ -1168,6 +1233,7 @@ exit /b 1 -- no cab, end compress
 ::  - v1.05 Add NltestDomInfo; mkCab
 ::  - v1.06 delete working files, if compressed
 ::  - v1.07 updates, fixes, ++ data
+::  - v1.08 validate input arguments
 
 :: ToDo:
 

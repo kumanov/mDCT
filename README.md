@@ -85,6 +85,11 @@ Usage examples:
     - net statistics server
   - wmic nic get
   - wmic nicconfig get
+  - msft_providers get Provider,HostProcessIdentifier
+  - VMware stat
+    - upgrade status
+    - timesync status
+    - stat raw text
 - Crash Dumps
   - crash dump files list
   - Recover OS settings
