@@ -55,6 +55,8 @@ Usage examples:
     - HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC
     - HKLM\Software\Microsoft\RPC
     - HKLM\Software\Microsoft\OLE
+	- reg query misc
+	  - "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
   - Windows Time status/settings
     - w32tm /query /configuration /verbose
     - w32tm /query /configuration
@@ -62,11 +64,13 @@ Usage examples:
 - Network information
   - netstat -nato
   - ipconfig /displaydns
-  - netsh int ipv4 show dynamicport tcp
-  - netsh int tcp show global
-  - netsh interface ipv4 show ipstats
-  - netsh interface ipv4 show tcpstats
-  - netsh int ipv4 show offload
+  - netsh config/stats
+    - netsh int ipv4 show dynamicport tcp
+    - netsh int tcp show global
+    - netsh int ipv4 show offload
+    - netsh interface ipv4 show ipstats
+    - netsh interface ipv4 show tcpstats
+	- netsh http show urlacl
   - nslookup - forward & revers
   - arp -a -v
   - route print
@@ -108,3 +112,10 @@ Usage examples:
   - cstn_status
   - ps output
   - shheap 1 check output
+  - list disk resident heap files
+  - copy station.ini file
+  = collect station configuration files
+    - station configuration files (*.stn)
+	- station toolbar files (*.stb)
+	- Display Links files
+	

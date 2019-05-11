@@ -11,6 +11,7 @@ setlocal enableDelayedExpansion
 ::  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ::  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+if defined _DbgOut ( echo. %time% : Start of mDCT++)
 :: handle /?
 if "%~1"=="/?" (
 	call :usage
@@ -69,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.08
-:: Last-Update by krasimir.kumanov@gmail.com: 2019-05-05
+set _ScriptVersion=v1.09
+:: Last-Update by krasimir.kumanov@gmail.com: 2019-05-11
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -348,6 +349,26 @@ goto :eof
 	)
 	@echo. >> "!_LogFileName!"
 	call :SleepX 1
+	ENDLOCAL
+	@goto :eof
+
+:LogWmicCmd [filename; command] - UTILITY to log command header and output in filename
+	SETLOCAL
+	for /f "tokens=1* delims=; " %%a in ("%*") do (
+		set _LogFileName=%%a
+		@echo ================================================================================== >> "!_LogFileName!"
+		@echo ===== %time% : %%b >> "!_LogFileName!"
+		@echo ================================================================================== >> "!_LogFileName!"
+		::%%b /Format:Texttable | more /s >> "!_LogFileName!" 2>&1
+		For /F "tokens=* delims=" %%h in ('%%b') do (
+			set "_line=%%h"
+			set "_line=!_line:~0,-1!"
+			echo !_line!>>"!_LogFileName!"
+		)
+	)
+	@echo. >> "!_LogFileName!"
+	call :SleepX 1
+	ENDLOCAL
 	@goto :eof
 
 :mkNewDir
@@ -381,6 +402,34 @@ goto :eof
 	%SYSTEMROOT%\SYSTEM32\REG.EXE %* >> %_RegFile% 2>&1
 	@goto :eof
 
+:GetRegValue Key Value Data Type -- returns a registry value
+::                               -- Key    [in]  - registry key
+::                               -- Value  [in]  - registry value
+::                               -- Data   [out] - return variable for Data
+::                               -- Type   [out] - return variable for Type, i.e.: REG_SZ, REG_MULTI_SZ, REG_DWORD_BIG_ENDIAN, REG_DWORD, REG_BINARY, REG_DWORD_LITTLE_ENDIAN, REG_NONE, REG_EXPAND_SZ
+:$created 20060101 :$changed 20080219 :$categories Registry
+:$source https://www.dostips.com
+:$lastmodified 20190505 - krasimir.kumanov@gmail.com
+SETLOCAL ENABLEDELAYEDEXPANSION
+set Key=%~1
+set Val=%~2
+if "%Val%"=="" (set v=/ve) ELSE set v=/v "%Val%"
+set Data=
+set Type=
+for /f "tokens=2,* delims= " %%a in ('reg query "%Key%" %v%^|findstr /b "....%match%"') do (
+    set Type=%%a
+	if /i "!Type!"=="REG_SZ" (
+		set Data="%%b"
+	) else (
+		set Data=%%b
+	)
+)
+( ENDLOCAL & REM RETURN VALUES
+    IF "%~3" NEQ "" (SET %~3=%Data%) ELSE echo.%Data%
+    IF "%~4" NEQ "" (SET %~4=%Type%)
+)
+EXIT /b
+
 :DoSqlCmd [database query] - run sql query
 	@echo ================================================================================== >> %_SqlFile%
 	@echo ===== %time% : sqlcmd DB:%~1 Q:%~2 >> %_SqlFile%
@@ -398,14 +447,59 @@ goto :eof
 	@goto :eof
 
 :DoNltestDomInfo [comment] - UTILITY to dump NLTEST Domain infos into log file
-	call :logitem . collecting NLTEST Domain information at %~1
-	set _NltestInfoFile=!_DirWork!\GeneralSystemInfo\NltestDomInfo.txt
+	call :logitem . collecting NLTEST Domain information
+	set _NltestInfoFile=!_DirWork!\GeneralSystemInfo\_NltestDomInfo.txt
 	call :InitLog !_NltestInfoFile!
 	call :LogCmd !_NltestInfoFile! nltest /dsgetsite
 	call :LogCmd !_NltestInfoFile! nltest /dsgetdc: /kdc /force
 	call :LogCmd !_NltestInfoFile! nltest /dclist:
 	call :LogCmd !_NltestInfoFile! nltest /trusted_domains
 	@goto :eof
+
+:getStationFiles   -- collect station configuration files
+	SETLOCAL
+	call :mkNewDir !_DirWork!\Station-logs
+
+	set _HMIWebLog=%HwProgramData%\HMIWebLog\
+	@set _stnFiles=!_DirWork!\Station-logs\_stnFiles.txt
+	:: create stn file list
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_HMIWebLog! -Include log.txt,hmiweblogY*.txt -Recurse | sls -Pattern 'Connecting using .stn file: (.*stn)$' | foreach{$_.Matches.Groups[1].Value} | sort -Unique | out-file !_stnFiles!}}
+	:: copy files
+	for /f "tokens=* delims=" %%h in ('type !_stnFiles!') DO (
+		set _stnFile=_%%~nh%%~xh
+		if exist "!_DirWork!\Station-logs\!_stnFile!" (set _stnFile=_%%~nh_!random!%%~xh)
+		call :doCmd copy /y "%%h" "!_DirWork!\Station-logs\!_stnFile!"
+	)
+	call :SleepX 1
+	
+	:: get stb files
+	@set _stbFiles=%temp%\_stbFiles.txt
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_DirWork!\Station-logs\ -Include *.stn -Recurse | sls -Pattern 'Toolbar_Settings=(.*stb)$' | foreach{$_.Matches.Groups[1].Value} | sort -Unique | out-file !_stbFiles!}}
+	:: copy files
+	for /f "tokens=* delims=" %%h in ('type !_stbFiles!') DO (
+		set _stbFile=_%%~nh%%~xh
+		if exist "!_DirWork!\Station-logs\!_stbFile!" (set _stbFile=_%%~nh_!random!%%~xh)
+		call :doCmd copy /y "%%h" "!_DirWork!\Station-logs\!_stbFile!"
+	)
+	del !_stbFiles!
+	call :SleepX 1
+
+	:: get Display Links files
+	@set _dspLinksFiles=%temp%\_stbFiles.txt
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_DirWork!\Station-logs\ -Include *.stn -Recurse | sls -Pattern 'DisplayLinksPath=(.*xml)$' | foreach{$_.Matches.Groups[1].Value} | sort -Unique | out-file !_dspLinksFiles!}}
+	:: copy files
+	for /f "tokens=* delims=" %%h in ('type !_dspLinksFiles!') DO (
+		set _dspLinksFile=_%%~nh%%~xh
+		if exist "!_DirWork!\Station-logs\!_dspLinksFile!" (set _dspLinksFile=_%%~nh_!random!%%~xh)
+		call :doCmd copy /y "%%h" "!_DirWork!\Station-logs\!_dspLinksFile!"
+	)
+	del !_dspLinksFiles!
+	call :SleepX 1
+
+	(ENDLOCAL & REM -- RETURN VALUES
+	)
+	exit /b
+
 
 :mkCab sourceFolder cabFolder cabName	-- make cab file
 ::										-- sourceFolder [in] - source folder
@@ -476,6 +570,38 @@ set src=%upp%!src:%mat%=!
 )
 exit /b
 
+:getTimeZoneInfo
+::                 -- %~1 [out]: TimeZone Name
+::                 -- %~1 [out]: TimeZone Bias
+SETLOCAL
+REM Obtain the ActiveBias value and convert to decimal
+for /f "tokens=3" %%a in ('reg query HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation /v ActiveTimeBias') do set /a abias=%%a
+for /f "tokens=2*" %%h in ('reg query HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation /v TimeZoneKeyName') do set tzn=%%i 2>NUL
+
+REM Set the + or - sign variable to reflect the timezone offset
+IF "%abias:~0,1%"=="-" (set si=+) ELSE (set si=-)
+for /f "tokens=1 delims=-" %%t in ('echo %abias%') do set tzc=%%t
+
+REM Calculate to obtain floating points (decimal values)
+set /a tzd=100*%tzc%/60
+
+REM Calculate the active bias to obtain the hour
+set /a tze=%tzc%/60
+
+REM Set the minutes based on the result of the floating point calculation
+IF "%tzd%"=="0" (set en=00 && set si=)
+IF "%tzd:~1%"=="00" (set en=00) ELSE IF "%tzd:~2%"=="00" (set en=00 && set tz=%tzd:~0,2%)
+IF "%tzd:~1%"=="50" (set en=30) ELSE IF "%tzd:~2%"=="50" (set en=30 && set tz=%tzd:~0,2%)
+IF "%tzd:~1%"=="75" (set en=45) ELSE IF "%tzd:~2%"=="75" (set en=45 && set tz=%tzd:~0,2%)
+
+REM Adding a 0 to the beginning of a single digit hour value
+IF %tze% LSS 10 (set tz=0%tze%)
+(ENDLOCAL & REM -- RETURN VALUES
+	IF "%~1" NEQ "" SET %~1=%tzn%
+	IF "%~2" NEQ "" SET %~2=%si%%tz%%en%
+)
+exit /b
+
 :myFunctionName    -- function description here
 ::                 -- %~1 [in,out,opt]: argument description here
 SETLOCAL
@@ -518,7 +644,11 @@ call :logitem netsh firewall show config
 call :LogCmd !_DirWork!\GeneralSystemInfo\firewall.txt netsh firewall show config
 
 call :logitem get time zone information
-call :doCmd wmic /output:!_DirWork!\GeneralSystemInfo\timezone.output.txt timezone get Bias, Description, StandardName
+call :getTimeZoneInfo _tzName _tzBias
+call :InitLog !_DirWork!\GeneralSystemInfo\timezone.output.txt
+@echo TimeZone Name: %_tzName% >>!_DirWork!\GeneralSystemInfo\timezone.output.txt
+@echo TimeZone Bias: %_tzBias% >>!_DirWork!\GeneralSystemInfo\timezone.output.txt
+call :SleepX 1
 
 (call :logitem export Windows Events
 call :doCmd wevtutil epl Application !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Application.evtx /overwrite:true
@@ -756,7 +886,7 @@ call :logitem . whoami - currently logged in user
 call :InitLog !_DirWork!\GeneralSystemInfo\_whoami.txt
 call :LogCmd !_DirWork!\GeneralSystemInfo\_whoami.txt whoami /all
 
-call :logitem . Windows Environment Variables
+call :logitem . fetching environment Variables
 call :InitLog !_DirWork!\GeneralSystemInfo\_EnvVariables.txt
 call :LogCmd !_DirWork!\GeneralSystemInfo\_EnvVariables.txt set
 
@@ -768,7 +898,7 @@ call :logitem . collecting GPResult output
 set _GPresultFile=!_DirWork!\GeneralSystemInfo\_GPresult.htm
 call :doCmd gpresult /h !_GPresultFile! /f
 
-call :DoNltestDomInfo %time%
+call :DoNltestDomInfo
 
 call :logitem . get power configuration settings
 set _powerCfgFile=!_DirWork!\GeneralSystemInfo\_powercfg.txt
@@ -790,23 +920,23 @@ if exist "%windir%\Honeywell_MsPatches.txt" (
 
 call :logitem . WindowsUpdate.log
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
-call :doCmd copy /y "%windir%\WindowsUpdate.log" "!_DirWork!\GeneralSystemInfo\"
+call :doCmd copy /y "%windir%\WindowsUpdate.log" "!_DirWork!\GeneralSystemInfo\_WindowsUpdate.log"
 if exist %windir%\Logs\WindowsUpdate (
 	call :logitem . get Windows Update ETL Logs
-	call :mkNewDir  !_DirWork!\GeneralSystemInfo\WindowsUpdateEtlLogs
-	call :doCmd copy /y "%windir%\Logs\WindowsUpdate\*.etl" "!_DirWork!\GeneralSystemInfo\WindowsUpdateEtlLogs\"
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo\_WindowsUpdateEtlLogs
+	call :doCmd copy /y "%windir%\Logs\WindowsUpdate\*.etl" "!_DirWork!\GeneralSystemInfo\_WindowsUpdateEtlLogs\"
 )
 
 :WmiRootSecurityDescriptor
 call :logitem . WMI Root Security Descriptor
-call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\WmiRootSecurityDescriptor.txt /namespace:\\root path __systemsecurity call GetSecurityDescriptor
+call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt /namespace:\\root path __systemsecurity call GetSecurityDescriptor
 
 :: AV on accesss scanner settings
 call :doCmd REG EXPORT "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\HKLM_McAfee_OnAccessScanner.txt
 
 set _SecurityFile=!_DirWork!\GeneralSystemInfo\_SecurityCfg.txt
 call :InitLog !_SecurityFile!
-call :logitem . secedit /export /cfg "!_SecurityFile!"
+call :logitem . secedit /export /cfg
 secedit /export /cfg !_SecurityFile! >> !_LogFile!
 call :SleepX 1
 
@@ -830,6 +960,12 @@ call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_OLE_registry_settings.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\Software\Microsoft\OLE" /s
+
+call :logOnlyItem . reg query misc
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
+call :InitLog !_RegFile!
+call :GetReg QUERY  "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
 
 call :logOnlyItem . Windows Time status/settings
 set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
@@ -860,66 +996,67 @@ goto :eof
 :NetworkAddData
 call :logitem * Network configuration data *
 
-call :mkNewDir !_DirWork!\Network
+call :mkNewDir !_DirWork!\_Network
 
 call :logitem . netstat connections
-set _NetStatFile=!_DirWork!\Network\netstat-nato.txt
+set _NetStatFile=!_DirWork!\_Network\netstat-nato.txt
 call :InitLog !_NetStatFile!
 call :LogCmd !_NetStatFile! netstat -nato
 
 call :logitem . ipconfig output
-call :InitLog !_DirWork!\Network\ipconfig.txt
-call :LogCmd !_DirWork!\Network\ipconfig.txt ipconfig /all
-call :InitLog !_DirWork!\Network\ipconfig.displaydns.txt
-call :LogCmd !_DirWork!\Network\ipconfig.displaydns.txt ipconfig /displaydns
+call :InitLog !_DirWork!\_Network\ipconfig.txt
+call :LogCmd !_DirWork!\_Network\ipconfig.txt ipconfig /all
+call :InitLog !_DirWork!\_Network\ipconfig.displaydns.txt
+call :LogCmd !_DirWork!\_Network\ipconfig.displaydns.txt ipconfig /displaydns
 
 :NetSh_ConfigAndStats
 call :logitem . netsh config/stats
-set _NetShFile=!_DirWork!\Network\netsh.output.txt
+set _NetShFile=!_DirWork!\_Network\netsh.output.txt
 call :InitLog !_NetShFile!
 call :LogCmd !_NetShFile! netsh int ipv4 show dynamicport tcp
 call :LogCmd !_NetShFile! netsh int tcp show global
 call :LogCmd !_NetShFile! netsh int ipv4 show offload
 call :LogCmd !_NetShFile! netsh interface ipv4 show ipstats
 call :LogCmd !_NetShFile! netsh interface ipv4 show tcpstats
+call :LogCmd !_NetShFile! netsh http show urlacl
 
 :nslookup
 call :logitem . nslookup
 call :SleepX 1
 :: NS LookUp - Forward
-echo ======================================== > !_DirWork!\Network\nslookup.txt
-echo %date% %time% >> !_DirWork!\Network\nslookup.txt
-echo cmd: nslookup %computername% >> !_DirWork!\Network\nslookup.txt
-nslookup %computername% >> !_DirWork!\Network\nslookup.txt  2>>&1
+echo ======================================== > !_DirWork!\_Network\nslookup.txt
+echo %date% %time% >> !_DirWork!\_Network\nslookup.txt
+echo cmd: nslookup %computername% >> !_DirWork!\_Network\nslookup.txt
+nslookup %computername% >> !_DirWork!\_Network\nslookup.txt  2>>&1
 :: NS LookUp - Reverse
 set ip_address_string="IPv4 Address"
 for /f "usebackq tokens=2 delims=:" %%f in (`ipconfig ^| findstr /c:%ip_address_string%`) do (
-	echo ======================================== >> !_DirWork!\Network\nslookup.txt
-	echo %date% %time% >> !_DirWork!\Network\nslookup.txt
-    echo Your IP Address is: %%f  >> !_DirWork!\Network\nslookup.txt
-	echo cmd: nslookup %%f >> !_DirWork!\Network\nslookup.txt
-	nslookup %%f >> !_DirWork!\Network\nslookup.txt  2>>&1
+	echo ======================================== >> !_DirWork!\_Network\nslookup.txt
+	echo %date% %time% >> !_DirWork!\_Network\nslookup.txt
+    echo Your IP Address is: %%f  >> !_DirWork!\_Network\nslookup.txt
+	echo cmd: nslookup %%f >> !_DirWork!\_Network\nslookup.txt
+	nslookup %%f >> !_DirWork!\_Network\nslookup.txt  2>>&1
 )
-echo ======================================== >> !_DirWork!\Network\nslookup.txt
-echo %date% %time% - done>> !_DirWork!\Network\nslookup.txt
+echo ======================================== >> !_DirWork!\_Network\nslookup.txt
+echo %date% %time% - done>> !_DirWork!\_Network\nslookup.txt
 
 call :logitem . route / arp
-call :InitLog !_DirWork!\Network\arp.txt
-call :LogCmd !_DirWork!\Network\arp.txt  arp -a -v
-call :InitLog !_DirWork!\Network\route.print.txt
-call :LogCmd !_DirWork!\Network\route.print.txt route print
+call :InitLog !_DirWork!\_Network\arp.txt
+call :LogCmd !_DirWork!\_Network\arp.txt  arp -a -v
+call :InitLog !_DirWork!\_Network\route.print.txt
+call :LogCmd !_DirWork!\_Network\route.print.txt route print
 
 call :logitem . nbtstat-n
-call :InitLog !_DirWork!\Network\nbtstat.txt
-call :LogCmd !_DirWork!\Network\nbtstat.txt  nbtstat -n
+call :InitLog !_DirWork!\_Network\nbtstat.txt
+call :LogCmd !_DirWork!\_Network\nbtstat.txt  nbtstat -n
 
 :advfirewall
 call :logitem . firewall rules
-call :InitLog !_DirWork!\Network\firewall_rules.txt
-call :LogCmd !_DirWork!\Network\firewall_rules.txt netsh advfirewall monitor show firewall verbose
+call :InitLog !_DirWork!\_Network\firewall_rules.txt
+call :LogCmd !_DirWork!\_Network\firewall_rules.txt netsh advfirewall monitor show firewall verbose
 
 call :logitem . net commands
-set _NetCmdFile=!_DirWork!\Network\netcmd.txt
+set _NetCmdFile=!_DirWork!\_Network\netcmd.txt
 call :InitLog !_NetCmdFile!
 call :LogCmd !_NetCmdFile! NET SHARE
 call :LogCmd !_NetCmdFile! NET START
@@ -932,7 +1069,7 @@ call :LogCmd !_NetCmdFile! NET CONFIG WKSTA
 call :LogCmd !_NetCmdFile! NET STATISTICS Workstation
 call :LogCmd !_NetCmdFile! NET STATISTICS SERVER
 
-set _RegFile=!_DirWork!\Network\TcpIpParameters.txt
+set _RegFile=!_DirWork!\_Network\TcpIpParameters.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /v ArpRetryCount
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /s
@@ -942,21 +1079,23 @@ call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\iphlpsvc" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002bE10318}" /s
 
 call :logitem . wmic nic/nicconfig get
-call :InitLog !_DirWork!\Network\nicconfig.txt
-call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nic get >NUL
-call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nicconfig get Description,DHCPEnabled,Index,InterfaceIndex,IPEnabled,MACAddress >NUL
-call :doCmd  wmic /append:!_DirWork!\Network\nicconfig.txt nicconfig get >NUL
+set _NicConfig=!_DirWork!\_Network\nicconfig.txt
+call :InitLog !_NicConfig!
+call :LogWmicCmd !_NicConfig! wmic nic get
+call :LogWmicCmd !_NicConfig! wmic nicconfig get Description,DHCPEnabled,Index,InterfaceIndex,IPEnabled,MACAddress
+call :LogWmicCmd !_NicConfig! wmic nicconfig get
+
 
 call :logitem . msft_providers get Provider,HostProcessIdentifier 
-call :InitLog !_DirWork!\Network\nicconfig.txt
-call :doCmd  wmic /append:!_DirWork!\Network\msft_providers.txt path msft_providers get Provider,HostProcessIdentifier >NUL
+call :InitLog !_DirWork!\_Network\msft_providers.txt
+call :LogWmicCmd !_DirWork!\_Network\msft_providers.txt wmic path msft_providers get Provider,HostProcessIdentifier
 
 
 if exist "c:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe" (
 	set _vmtbcmd="C:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe"
 	call :logOnlyItem . VMWare status
-	call :mkNewDir  !_DirWork!\GeneralSystemInfo
-	set _vmStatLog=!_DirWork!\GeneralSystemInfo\VMware.stat.txt
+	call :mkNewDir  !_DirWork!\_Network
+	set _vmStatLog=!_DirWork!\_Network\VMware.stat.txt
 	call :InitLog !_vmStatLog!
 	call :LogCmd !_vmStatLog! !_vmtbcmd!  upgrade status
 	call :LogCmd !_vmStatLog! !_vmtbcmd!  timesync status
@@ -1055,15 +1194,26 @@ if %errorlevel%==0 (
 
 where shheap >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem Experion shheap 1 check
+	call :logitem . Experion shheap 1 check
 	call :mkNewDir !_DirWork!\ServerDataDirectory
     call :InitLog !_DirWork!\ServerDataDirectory\_shheap.1.check.output.txt
     call :logCmd !_DirWork!\ServerDataDirectory\_shheap.1.check.output.txt shheap 1 check
 )
 
-(call :logitem list disk resident heap files
+(call :logitem . list disk resident heap files
 call :mkNewDir !_DirWork!\ServerDataDirectory
 call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\locks" "%HwProgramData%\Experion PKS\Server\data\dual_q" "%HwProgramData%\Experion PKS\Server\data\gda" "%HwProgramData%\Experion PKS\Server\data\tagcache" "%HwProgramData%\Experion PKS\Server\data\taskrequest" "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*"
+)
+
+if exist "%HwProgramData%\Experion PKS\Client\Station\station.ini" (
+	call :logitem . copy station.ini file
+	call :mkNewDir !_DirWork!\Station-logs
+	call :doCmd copy /y "%HwProgramData%\Experion PKS\Client\Station\station.ini" !_DirWork!\Station-logs\_station.ini
+)
+
+if exist "%HwProgramData%\HMIWebLog\Log.txt" (
+	call :logitem . collect station configuration files
+	call :getStationFiles
 )
 
 goto :eof
@@ -1076,28 +1226,28 @@ if %errorlevel% NEQ 0 (
 	call :logOnlyItem no sqlcmd utility - skip sql queries
 	goto :eof
 )
-	call :logitem * query MS SQL *
+	call :logitem * MS SQL queries *
 	call :mkNewDir !_DirWork!\MSSQL-Logs
-	call :logitem select count^(*^) from NON_ERDB_POINTS_PARAMS
-	set _SqlFile=!_DirWork!\MSSQL-Logs\erdb.p2p.txt
+	call :logitem . select count^(*^) from NON_ERDB_POINTS_PARAMS
+	set _SqlFile=!_DirWork!\MSSQL-Logs\_erdb.p2p.txt
 	call :InitLog !_SqlFile!
 	call :DoSqlCmd ps_erdb "select count(*) from NON_ERDB_POINTS_PARAMS"
 	sqlcmd -E -w 10000 -d ps_erdb -Q "select s.StrategyName as NonCEEStrategy, containingStrat.StrategyName +'.'+ strat_cont.StrategyName as ReferencedBlock, CASE WHEN s.StrategyID  & 0x80000000 = 0 THEN 'Project' ELSE 'Monitoring' END 'Avatar' from STRATEGY S inner join NON_ERDB_POINTS_PARAMS N on n.StrategyID = S.StrategyID and n.ReferenceCount > 0 inner join CONNECTION Conn on conn.PassiveParamID = N.ParamID and conn.passivecontrolid = n.strategyid  INNER JOIN STRATEGY strat_cont ON strat_cont.StrategyID = conn.ActiveControlID INNER JOIN RELATIONSHIP rel ON rel.TargetID = strat_cont.StrategyID AND rel.RelationshipID = 3 INNER JOIN STRATEGY containingStrat ON rel.SourceID = containingStrat.StrategyID " >>!_SqlFile!
 
 	:: SQL Loggins
-	set _SqlFile=!_DirWork!\MSSQL-Logs\SqlLogins.txt
+	set _SqlFile=!_DirWork!\MSSQL-Logs\_SqlLogins.txt
 	call :InitLog !_SqlFile!
-	call :logitem EXEC sp_helplogins
+	call :logitem . EXEC sp_helplogins
 	call :DoSqlCmd master "EXEC sp_helplogins"
-	call :logitem SELECT name, type_desc, is_disabled FROM sys.server_principals
+	call :logitem . SELECT name, type_desc, is_disabled FROM sys.server_principals
 	call :DoSqlCmd master "SELECT name, type_desc, is_disabled FROM sys.server_principals"
-	call :logitem EXEC sp_who2
+	call :logitem . EXEC sp_who2
 	call :DoSqlCmd "master" "EXEC sp_who2"
 
 ::emsqueries
 	call :mkNewDir !_DirWork!\MSSQL-Logs
-	call :logitem emsevents sql queries
-	set _SqlFile=!_DirWork!\MSSQL-Logs\emsqueries.output.txt
+	call :logitem . emsevents sql queries
+	set _SqlFile=!_DirWork!\MSSQL-Logs\_emsqueries.output.txt
 	call :InitLog !_SqlFile!
 	call :DoSqlCmd EMSEvents "SELECT @@VERSION"
 	call :DoSqlCmd EMSEvents "SELECT SERVERPROPERTY('MachineName')"
@@ -1133,8 +1283,8 @@ if %errorlevel% NEQ 0 (
 
 ::CheckSQLDBLogs
 	call :mkNewDir !_DirWork!\MSSQL-Logs
-	call :logitem Check SQL DB Logs
-	set _SqlFile=!_DirWork!\MSSQL-Logs\CheckSQLDBLogs.txt
+	call :logitem . Check SQL DB Logs
+	set _SqlFile=!_DirWork!\MSSQL-Logs\_CheckSQLDBLogs.txt
 	call :InitLog !_SqlFile!
 	call :DoSqlCmd master "select [name] AS 'Database Name', DATABASEPROPERTYEX([name],'recovery') AS 'Recovery Model' from master.dbo.SysDatabases"
 	call :DoSqlCmd master "DBCC SQLPERF(LOGSPACE)"
@@ -1234,6 +1384,12 @@ exit /b 1 -- no cab, end compress
 ::  - v1.06 delete working files, if compressed
 ::  - v1.07 updates, fixes, ++ data
 ::  - v1.08 validate input arguments
+::  - v1.09 - collect station configuration files
+::    copy station.ini file
+::    station configuration files (*.stn)
+::    station toolbar files (*.stb)
+::    Display Links files
+
 
 :: ToDo:
 
@@ -1250,6 +1406,11 @@ exit /b 1 -- no cab, end compress
 ::    The XML files contain the last asset, alarm group and system models that were downloaded to the server from the Enterprise Model Builder.
 ::    The log files contain any errors or warnings from these downloads
 
+:: - [x] collect station configuration files
+::    - station configuration files (*.stn)
+::    - station toolbar files (*.stb)
+::    - Display Links files
+:: - [x] validate input parameters
 :: - [x] console troubleshooting
 ::If using the Windows firewall, dump its configuration on Server and Console Station:
 ::	netsh firewall show config >firewall.txt	(Included in DCT for 310+)
