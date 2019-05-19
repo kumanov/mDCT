@@ -61,6 +61,7 @@ Usage examples:
     - w32tm /query /configuration /verbose
     - w32tm /query /configuration
     - HKLM\SYSTEM\CurrentControlSet\Services\W32Time
+  - get GDI Handles Count
 - Network information
   - netstat -nato
   - ipconfig /displaydns

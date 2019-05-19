@@ -70,7 +70,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.09
+set _ScriptVersion=v1.10
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-05-11
 
 :: change the cmd prompt environment to English
@@ -499,6 +499,38 @@ EXIT /b
 	(ENDLOCAL & REM -- RETURN VALUES
 	)
 	exit /b
+
+:getGDIHandlesCount    -- function description here
+SETLOCAL
+call :logitem . get GDI Handles Count
+set _psFile=%temp%\psFile.ps1
+set _outFile=!_DirWork!\GeneralSystemInfo\_GDIHandlesCount.txt
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :InitLog !_outFile!
+:: create ps1 file
+>!_psFile!  echo Add-Type -Name NativeMethods -Namespace Win32 -MemberDefinition @'
+>>!_psFile! echo [DllImport("User32.dll")]
+>>!_psFile! echo public static extern int GetGuiResources(IntPtr hProcess, int uiFlags);
+>>!_psFile! echo '@;
+>>!_psFile! echo $allProcesses = [System.Diagnostics.Process]::GetProcesses(); $auxCountHandles = [int]0; $auxCountProcess = [int]0; $GuiResources = @();
+>>!_psFile! echo ForEach ($p in $allProcesses) { if ( [string]::IsNullOrEmpty( $p.Handle)) { continue }; $auxCountProcess += 1; $auxGdiHandles = [Win32.NativeMethods]::GetGuiResources($p.Handle, 0);
+>>!_psFile! echo If ($auxGdiHandles -eq 0) { continue }
+>>!_psFile! echo $auxCountHandles += $auxGdiHandles; $auxDict = [ordered]@{ PID = $p.Id; GDIHandles = $auxGdiHandles; ProcessName = $p.Name; };
+>>!_psFile! echo $GuiResources += [PSCustomObject]$auxDict; };
+>>!_psFile! echo $GuiResources ^| sort GDIHandles -Desc ^| select -First 10 ^| out-file !_outFile! -Append -Encoding ascii
+>>!_psFile! echo '' ^| out-file !_outFile! -Append -Encoding ascii
+>>!_psFile! echo $('{0} processes; {1}/{2} with/without GDI objects' -f $allProcesses.Count, $GuiResources.Count, ($allProcesses.Count - $GuiResources.Count)) ^| out-file !_outFile! -Append -Encoding ascii
+>>!_psFile! echo "Total number of GDI handles: $auxCountHandles" ^| out-file !_outFile! -Append -Encoding ascii
+PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass %_psFile%
+if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at getGDIHandlesCount with PowerShell'. )
+if "%errorlevel%" neq "0" (
+	call :logItem %time% .. ERROR: %errorlevel% - 'getGDIHandlesCount with PowerShell' failed.
+	)
+::del PS file
+call :doit del "!_psFile!"
+ENDLOCAL
+call :SleepX 1
+exit /b
 
 
 :mkCab sourceFolder cabFolder cabName	-- make cab file
@@ -979,7 +1011,7 @@ call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s
 (:: temperature
 if not "%_VEP%"=="1" (
 	call :mkNewDir  !_DirWork!\GeneralSystemInfo
-	set _ThermalZoneTemperature=!_DirWork!\GeneralSystemInfo\ThermalZoneTemperature.txt
+	set _ThermalZoneTemperature=!_DirWork!\GeneralSystemInfo\_ThermalZoneTemperature.txt
 	call :InitLog !_ThermalZoneTemperature!
 	@echo Temperature at thermal zone in tenths of degrees Kelvin >>!_ThermalZoneTemperature!
 	@echo Convert to Celsius: xxx / 10 - 273.15 >>!_ThermalZoneTemperature!
@@ -987,6 +1019,9 @@ if not "%_VEP%"=="1" (
 	wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature | more /s >>!_ThermalZoneTemperature!
 )
 )
+
+:: get GDI Handles Count
+call :getGDIHandlesCount
 
 goto :eof
 :endregion Windows
@@ -1017,6 +1052,7 @@ call :LogCmd !_NetShFile! netsh int ipv4 show dynamicport tcp
 call :LogCmd !_NetShFile! netsh int tcp show global
 call :LogCmd !_NetShFile! netsh int ipv4 show offload
 call :LogCmd !_NetShFile! netsh interface ipv4 show ipstats
+call :LogCmd !_NetShFile! netsh interface ipv4 show udpstats
 call :LogCmd !_NetShFile! netsh interface ipv4 show tcpstats
 call :LogCmd !_NetShFile! netsh http show urlacl
 
@@ -1165,7 +1201,7 @@ call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\Loca
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options" /s
 
 call :logitem . Recover OS settings
-call :DoCmd  wmic /output:!_DirWork!\CrashDumps\recoveros.txt RECOVEROS
+call :DoCmd  wmic /output:!_DirWork!\CrashDumps\_recoveros.txt RECOVEROS
 )
 
 where dual_status >NUL 2>&1
@@ -1389,7 +1425,7 @@ exit /b 1 -- no cab, end compress
 ::    station configuration files (*.stn)
 ::    station toolbar files (*.stb)
 ::    Display Links files
-
+::  - v1.10 - get GDI Handles Count
 
 :: ToDo:
 
@@ -1397,15 +1433,15 @@ exit /b 1 -- no cab, end compress
 ::    reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
 ::    if %ERRORLEVEL% EQU 0 goto :noMcAfeeScanner
 
-:: - [] Windows time
-::    w32tm /query /configuration /verbose
-::    w32tm /query /configuration
-::    reg query HKLM\SYSTEM\CurrentControlSet\Services\W32Time /s
 
 :: - [] Log and XML files from C:\Program Files\Honeywell\Experion PKS\Engineering Tools\temp\EMB.
 ::    The XML files contain the last asset, alarm group and system models that were downloaded to the server from the Enterprise Model Builder.
 ::    The log files contain any errors or warnings from these downloads
 
+:: - [x] Windows time
+::    w32tm /query /configuration /verbose
+::    w32tm /query /configuration
+::    reg query HKLM\SYSTEM\CurrentControlSet\Services\W32Time /s
 :: - [x] collect station configuration files
 ::    - station configuration files (*.stn)
 ::    - station toolbar files (*.stb)
