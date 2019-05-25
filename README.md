@@ -95,6 +95,7 @@ Usage examples:
     - upgrade status
     - timesync status
     - stat raw text
+  - get NetTcpPortSharing config file
 - Crash Dumps
   - crash dump files list
   - Recover OS settings

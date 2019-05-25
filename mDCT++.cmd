@@ -70,7 +70,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.11
+set _ScriptVersion=v1.12
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-05-25
 
 :: change the cmd prompt environment to English
@@ -1126,7 +1126,6 @@ call :logitem . msft_providers get Provider,HostProcessIdentifier
 call :InitLog !_DirWork!\_Network\msft_providers.txt
 call :LogWmicCmd !_DirWork!\_Network\msft_providers.txt wmic path msft_providers get Provider,HostProcessIdentifier
 
-
 if exist "c:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe" (
 	set _vmtbcmd="C:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe"
 	call :logOnlyItem . VMWare status
@@ -1140,6 +1139,14 @@ if exist "c:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe" (
 		call :logcmd !_vmStatLog! !_vmtbcmd! stat raw text %%g
 	)
 )
+
+call :logitem . get NetTcpPortSharing config file 
+for /f "usebackq skip=1" %%h in (`wmic service where "name='NetTcpPortSharing'" get PathName`) do (
+	if exist %%h.config (
+		call :doCmd copy /y "%%h" "!_DirWork!\_Network\"
+		)
+	)
+
 
 goto :eof
 :endregion NetworkAddData
@@ -1437,6 +1444,7 @@ exit /b 1 -- no cab, end compress
 ::    Display Links files
 ::  - v1.10 - get GDI Handles Count
 ::  - v1.11 - Backbuild history assignments
+::  - v1.12 - get NetTcpPortSharing config file
 
 :: ToDo:
 
