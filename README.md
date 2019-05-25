@@ -43,7 +43,7 @@ Usage examples:
   - Hotfixes
   - Power settings
     - powercfg /query
-	- "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
+    - "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
   - WindowsUpdate.log
     - collect %windir%\Logs\WindowsUpdate\*.etl
   - SystemInfo.exe output
@@ -55,8 +55,8 @@ Usage examples:
     - HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC
     - HKLM\Software\Microsoft\RPC
     - HKLM\Software\Microsoft\OLE
-	- reg query misc
-	  - "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
+    - reg query misc
+      - "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
   - Windows Time status/settings
     - w32tm /query /configuration /verbose
     - w32tm /query /configuration
@@ -71,7 +71,7 @@ Usage examples:
     - netsh int ipv4 show offload
     - netsh interface ipv4 show ipstats
     - netsh interface ipv4 show tcpstats
-	- netsh http show urlacl
+    - netsh http show urlacl
   - nslookup - forward & revers
   - arp -a -v
   - route print
@@ -117,6 +117,6 @@ Usage examples:
   - copy station.ini file
   = collect station configuration files
     - station configuration files (*.stn)
-	- station toolbar files (*.stb)
-	- Display Links files
-	
+    - station toolbar files (*.stb)
+    - Display Links files
+  - Backbuild history assignments

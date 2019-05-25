@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.10
-:: Last-Update by krasimir.kumanov@gmail.com: 2019-05-11
+set _ScriptVersion=v1.11
+:: Last-Update by krasimir.kumanov@gmail.com: 2019-05-25
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -298,7 +298,7 @@ goto :eof
 :InitLog [LogFileName]
 	@if not exist %~1 (
 		@echo.%date% %time% . INITIALIZE file %~1 by %USERNAME% on %COMPUTERNAME% in Domain %USERDOMAIN% > "%~1"
-		@echo.mDCT++ [%_ScriptVersion%] ^(krasimir.kumanov@gmail.com^)^, link: https://github.com/kumanov/mDCT >> "%~1"
+		@echo.mDCT++ [%_ScriptVersion%] ^(krasimir.kumanov@gmail.com^)^, git: https://github.com/kumanov/mDCT >> "%~1"
 		@echo.>> "%~1"
 	)
 	@goto :eof
@@ -512,8 +512,8 @@ call :InitLog !_outFile!
 >>!_psFile! echo [DllImport("User32.dll")]
 >>!_psFile! echo public static extern int GetGuiResources(IntPtr hProcess, int uiFlags);
 >>!_psFile! echo '@;
->>!_psFile! echo $allProcesses = [System.Diagnostics.Process]::GetProcesses(); $auxCountHandles = [int]0; $auxCountProcess = [int]0; $GuiResources = @();
->>!_psFile! echo ForEach ($p in $allProcesses) { if ( [string]::IsNullOrEmpty( $p.Handle)) { continue }; $auxCountProcess += 1; $auxGdiHandles = [Win32.NativeMethods]::GetGuiResources($p.Handle, 0);
+>>!_psFile! echo $allProcesses = Get-Process; $auxCountHandles = [int]0; $auxCountProcess = [int]0; $GuiResources = @();
+>>!_psFile! echo ForEach ($p in $allProcesses) { if ( ($p.Handle -eq '') -or ($p.Handle -eq $null) ) { continue }; $auxCountProcess += 1; $auxGdiHandles = [Win32.NativeMethods]::GetGuiResources($p.Handle, 0);
 >>!_psFile! echo If ($auxGdiHandles -eq 0) { continue }
 >>!_psFile! echo $auxCountHandles += $auxGdiHandles; $auxDict = [ordered]@{ PID = $p.Id; GDIHandles = $auxGdiHandles; ProcessName = $p.Name; };
 >>!_psFile! echo $GuiResources += [PSCustomObject]$auxDict; };
@@ -1252,6 +1252,16 @@ if exist "%HwProgramData%\HMIWebLog\Log.txt" (
 	call :getStationFiles
 )
 
+where bckbld >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem . Backbuild history assignments
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :doCmd bckbld -np -nt -ng -ns -out !_DirWork!\ServerDataDirectory\_hist_scada.txt
+    call :doCmd bckbld -np -nt -ng -ns -tag CDA -out !_DirWork!\ServerDataDirectory\_hist_cda.txt
+    call :doCmd bckbld -np -nt -ng -ns -tag RDA -out !_DirWork!\ServerDataDirectory\_hist_dsa.txt
+    call :doCmd bckbld -np -nt -ng -ns -tag PSA -out !_DirWork!\ServerDataDirectory\_hist_psa.txt
+)
+
 goto :eof
 :endregion ExperionAddData
 
@@ -1426,6 +1436,7 @@ exit /b 1 -- no cab, end compress
 ::    station toolbar files (*.stb)
 ::    Display Links files
 ::  - v1.10 - get GDI Handles Count
+::  - v1.11 - Backbuild history assignments
 
 :: ToDo:
 
