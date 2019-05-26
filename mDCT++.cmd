@@ -70,7 +70,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.12
+set _ScriptVersion=v1.13
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-05-25
 
 :: change the cmd prompt environment to English
@@ -463,7 +463,7 @@ EXIT /b
 	set _HMIWebLog=%HwProgramData%\HMIWebLog\
 	@set _stnFiles=!_DirWork!\Station-logs\_stnFiles.txt
 	:: create stn file list
-	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_HMIWebLog! -Include log.txt,hmiweblogY*.txt -Recurse | sls -Pattern 'Connecting using .stn file: (.*stn)$' | foreach{$_.Matches.Groups[1].Value} | sort -Unique | out-file !_stnFiles!}}
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_HMIWebLog! -Include log.txt,hmiweblogY*.txt -Recurse | Select-String -Pattern 'Connecting using .stn file: (.*stn)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file !_stnFiles!}}
 	:: copy files
 	for /f "tokens=* delims=" %%h in ('type !_stnFiles!') DO (
 		set _stnFile=_%%~nh%%~xh
@@ -474,7 +474,7 @@ EXIT /b
 	
 	:: get stb files
 	@set _stbFiles=%temp%\_stbFiles.txt
-	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_DirWork!\Station-logs\ -Include *.stn -Recurse | sls -Pattern 'Toolbar_Settings=(.*stb)$' | foreach{$_.Matches.Groups[1].Value} | sort -Unique | out-file !_stbFiles!}}
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_DirWork!\Station-logs\ -Include *.stn -Recurse | Select-String -Pattern 'Toolbar_Settings=(.*stb)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file !_stbFiles!}}
 	:: copy files
 	for /f "tokens=* delims=" %%h in ('type !_stbFiles!') DO (
 		set _stbFile=_%%~nh%%~xh
@@ -486,7 +486,7 @@ EXIT /b
 
 	:: get Display Links files
 	@set _dspLinksFiles=%temp%\_stbFiles.txt
-	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_DirWork!\Station-logs\ -Include *.stn -Recurse | sls -Pattern 'DisplayLinksPath=(.*xml)$' | foreach{$_.Matches.Groups[1].Value} | sort -Unique | out-file !_dspLinksFiles!}}
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_DirWork!\Station-logs\ -Include *.stn -Recurse | Select-String -Pattern 'DisplayLinksPath=(.*xml)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file !_dspLinksFiles!}}
 	:: copy files
 	for /f "tokens=* delims=" %%h in ('type !_dspLinksFiles!') DO (
 		set _dspLinksFile=_%%~nh%%~xh
@@ -500,7 +500,7 @@ EXIT /b
 	)
 	exit /b
 
-:getGDIHandlesCount    -- function description here
+:getGDIHandlesCount    -- get GDI Handles Count
 SETLOCAL
 call :logitem . get GDI Handles Count
 set _psFile=%temp%\psFile.ps1
@@ -515,10 +515,10 @@ call :InitLog !_outFile!
 >>!_psFile! echo $allProcesses = Get-Process; $auxCountHandles = [int]0; $auxCountProcess = [int]0; $GuiResources = @();
 >>!_psFile! echo ForEach ($p in $allProcesses) { if ( ($p.Handle -eq '') -or ($p.Handle -eq $null) ) { continue }; $auxCountProcess += 1; $auxGdiHandles = [Win32.NativeMethods]::GetGuiResources($p.Handle, 0);
 >>!_psFile! echo If ($auxGdiHandles -eq 0) { continue }
->>!_psFile! echo $auxCountHandles += $auxGdiHandles; $auxDict = [ordered]@{ PID = $p.Id; GDIHandles = $auxGdiHandles; ProcessName = $p.Name; };
->>!_psFile! echo $GuiResources += [PSCustomObject]$auxDict; };
->>!_psFile! echo $GuiResources ^| sort GDIHandles -Desc ^| select -First 10 ^| out-file !_outFile! -Append -Encoding ascii
->>!_psFile! echo '' ^| out-file !_outFile! -Append -Encoding ascii
+>>!_psFile! echo $auxCountHandles += $auxGdiHandles; $auxDict = @{ PID = $p.Id; GDIHandles = $auxGdiHandles; ProcessName = $p.Name; };
+>>!_psFile! echo $GuiResources += New-Object -TypeName psobject -Property $auxDict; };
+>>!_psFile! echo $GuiResources ^| sort GDIHandles -Desc ^| select -First 10 ^| ft -a ^| out-file !_outFile! -Append -Encoding ascii
+::@::>>!_psFile! echo '' ^| out-file !_outFile! -Append -Encoding ascii
 >>!_psFile! echo $('{0} processes; {1}/{2} with/without GDI objects' -f $allProcesses.Count, $GuiResources.Count, ($allProcesses.Count - $GuiResources.Count)) ^| out-file !_outFile! -Append -Encoding ascii
 >>!_psFile! echo "Total number of GDI handles: $auxCountHandles" ^| out-file !_outFile! -Append -Encoding ascii
 PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass %_psFile%
@@ -530,6 +530,42 @@ if "%errorlevel%" neq "0" (
 call :doit del "!_psFile!"
 ENDLOCAL
 call :SleepX 1
+exit /b
+
+:getGropuMembers    -- get group mebers
+::                 -- %~1 [in]: group name
+::                 -- %~2 [in]: out file
+SETLOCAL
+set _groupName=%~1
+if defined %1 set _groupName=!%~1!
+set _outFile=%~2
+if defined %2 set _outFile=!%~2!
+
+>>!_outFile! echo ========================================
+>>!_outFile! echo get '!_groupName!' members
+>>!_outFile! echo ========================================
+PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { @(try{@(([ADSI]'WinNT://./!_groupName!').Invoke('Members'))}catch{}) | foreach{$_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null)} | Out-File '!_outFile!' -Append -Encoding ascii }}"
+if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - at get '!_groupName!' members with PowerShell. )
+if "%errorlevel%" neq "0" (
+	call :logItem %time% .. ERROR: %errorlevel% - get '!_groupName!' members with PowerShell failed.
+	)
+call :SleepX 1
+>>!_outFile! echo.
+
+ENDLOCAL
+call :SleepX 1
+exit /b
+
+:myFunctionName    -- function description here
+::                 -- %~1 [in,out,opt]: argument description here
+SETLOCAL
+REM.--function body here
+set LocalVar1=...
+set LocalVar2=...
+(ENDLOCAL & REM -- RETURN VALUES
+	IF "%~1" NEQ "" SET %~1=%LocalVar1%
+	IF "%~2" NEQ "" SET %~2=%LocalVar2%
+)
 exit /b
 
 
@@ -946,8 +982,8 @@ call :logitem . collecting Quick Fix Engineering information (Hotfixes)
 call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_Hotfixes.txt qfe list
 
 if exist "%windir%\Honeywell_MsPatches.txt" (
-	call :logitem get Honeywell_MsPatches.txt
-	call :doCmd copy /y "%windir%\Honeywell_MsPatches.txt" "!_DirWork!\GeneralSystemInfo\"
+	call :logitem . get Honeywell_MsPatches.txt
+	call :doCmd copy /y "%windir%\Honeywell_MsPatches.txt" "!_DirWork!\GeneralSystemInfo\_Honeywell_MsPatches.txt"
 )
 
 call :logitem . WindowsUpdate.log
@@ -1022,6 +1058,37 @@ if not "%_VEP%"=="1" (
 
 :: get GDI Handles Count
 call :getGDIHandlesCount
+
+
+:: get groups members
+call :logitem . get members of Experion groups
+set _membershipFile=!_DirWork!\GeneralSystemInfo\_groupsMembers.txt
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :InitLog !_membershipFile!
+set _group=Local Servers
+call :getGropuMembers _group _membershipFile
+set _group=Product Administrators
+call :getGropuMembers _group _membershipFile
+set _group=Local Ack View Only Users
+call :getGropuMembers _group _membershipFile
+set _group=Local Engineers
+call :getGropuMembers _group _membershipFile
+set _group=Local Operators
+call :getGropuMembers _group _membershipFile
+set _group=Local SecureComms Administrators
+call :getGropuMembers _group _membershipFile
+set _group=Local Supervisors
+call :getGropuMembers _group _membershipFile
+set _group=Local View Only Users
+call :getGropuMembers _group _membershipFile
+
+
+:: get mngr account information - Local Group Memberships
+call :logitem . get mngr account information - Local Group Memberships
+set _mngrUserAccount=!_DirWork!\GeneralSystemInfo\_mngrUserAccount.txt
+call :InitLog !_mngrUserAccount!
+call :LogCmd !_mngrUserAccount! net user mngr
+
 
 goto :eof
 :endregion Windows
@@ -1101,6 +1168,7 @@ call :LogCmd !_NetCmdFile! NET SESSION
 call :LogCmd !_NetCmdFile! NET USER
 call :LogCmd !_NetCmdFile! NET USE
 call :LogCmd !_NetCmdFile! NET ACCOUNTS
+call :LogCmd !_NetCmdFile! NET LOCALGROUP
 call :LogCmd !_NetCmdFile! NET CONFIG WKSTA
 call :LogCmd !_NetCmdFile! NET STATISTICS Workstation
 call :LogCmd !_NetCmdFile! NET STATISTICS SERVER
@@ -1142,8 +1210,8 @@ if exist "c:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe" (
 
 call :logitem . get NetTcpPortSharing config file 
 for /f "usebackq skip=1" %%h in (`wmic service where "name='NetTcpPortSharing'" get PathName`) do (
-	if exist %%h.config (
-		call :doCmd copy /y "%%h" "!_DirWork!\_Network\"
+	if exist "%%h.config" (
+		call :doCmd copy /y "%%h.config" "!_DirWork!\_Network\"
 		)
 	)
 
@@ -1445,6 +1513,11 @@ exit /b 1 -- no cab, end compress
 ::  - v1.10 - get GDI Handles Count
 ::  - v1.11 - Backbuild history assignments
 ::  - v1.12 - get NetTcpPortSharing config file
+::  - v1.13 groups membership
+::    net localgroup
+::    get groups members
+::    get mngr account information - Local Group Memberships
+
 
 :: ToDo:
 

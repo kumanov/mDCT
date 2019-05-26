@@ -62,6 +62,8 @@ Usage examples:
     - w32tm /query /configuration
     - HKLM\SYSTEM\CurrentControlSet\Services\W32Time
   - get GDI Handles Count
+  - get members of Experion groups
+  - get mngr account information - Local Group Memberships
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -84,6 +86,7 @@ Usage examples:
     - net share
     - net user
     - net accounts
+    - net localgroup
     - net config wksta
     - net use
     - net statistics workstation
