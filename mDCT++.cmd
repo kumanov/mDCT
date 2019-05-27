@@ -70,7 +70,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.14
+set _ScriptVersion=v1.15
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-05-25
 
 :: change the cmd prompt environment to English
@@ -1206,6 +1206,9 @@ for /f "usebackq skip=1" %%h in (`wmic service where "name='NetTcpPortSharing'" 
 		)
 	)
 
+call :logitem . get clientaccesspolicy.xml for Silverlight
+powershell -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
+call :SleepX 1
 
 goto :eof
 :endregion NetworkAddData
@@ -1509,6 +1512,7 @@ exit /b 1 -- no cab, end compress
 ::    get members of Experion groups
 ::    get mngr account information - Local Group Memberships
 ::  - v1.14 groups membership changed to use 'net localgroup <GrpName>'
+::  - v1.15 clientaccesspolicy.xml for Silverlight
 
 
 :: ToDo:

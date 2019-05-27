@@ -99,6 +99,7 @@ Usage examples:
     - timesync status
     - stat raw text
   - get NetTcpPortSharing config file
+  - get clientaccesspolicy.xml for Silverlight
 - Crash Dumps
   - crash dump files list
   - Recover OS settings
