@@ -70,7 +70,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.13
+set _ScriptVersion=v1.14
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-05-25
 
 :: change the cmd prompt environment to English
@@ -1060,27 +1060,18 @@ if not "%_VEP%"=="1" (
 call :getGDIHandlesCount
 
 
-:: get groups members
 call :logitem . get members of Experion groups
-set _membershipFile=!_DirWork!\GeneralSystemInfo\_groupsMembers.txt
+set _localgroups=!_DirWork!\GeneralSystemInfo\_localgroupsExperion.txt
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
-call :InitLog !_membershipFile!
-set _group=Local Servers
-call :getGropuMembers _group _membershipFile
-set _group=Product Administrators
-call :getGropuMembers _group _membershipFile
-set _group=Local Ack View Only Users
-call :getGropuMembers _group _membershipFile
-set _group=Local Engineers
-call :getGropuMembers _group _membershipFile
-set _group=Local Operators
-call :getGropuMembers _group _membershipFile
-set _group=Local SecureComms Administrators
-call :getGropuMembers _group _membershipFile
-set _group=Local Supervisors
-call :getGropuMembers _group _membershipFile
-set _group=Local View Only Users
-call :getGropuMembers _group _membershipFile
+call :InitLog !_localgroups!
+call :LogCmd !_localgroups! net localgroup "Local Servers"
+call :LogCmd !_localgroups! net localgroup "Product Administrators"
+call :LogCmd !_localgroups! net localgroup "Local Ack View Only Users"
+call :LogCmd !_localgroups! net localgroup "Local Engineers"
+call :LogCmd !_localgroups! net localgroup "Local Operators"
+call :LogCmd !_localgroups! net localgroup "Local SecureComms Administrators"
+call :LogCmd !_localgroups! net localgroup "Local Supervisors"
+call :LogCmd !_localgroups! net localgroup "Local View Only Users"
 
 
 :: get mngr account information - Local Group Memberships
@@ -1515,8 +1506,9 @@ exit /b 1 -- no cab, end compress
 ::  - v1.12 - get NetTcpPortSharing config file
 ::  - v1.13 groups membership
 ::    net localgroup
-::    get groups members
+::    get members of Experion groups
 ::    get mngr account information - Local Group Memberships
+::  - v1.14 groups membership changed to use 'net localgroup <GrpName>'
 
 
 :: ToDo:
