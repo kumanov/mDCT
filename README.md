@@ -64,6 +64,7 @@ Usage examples:
   - get GDI Handles Count
   - get members of Experion groups
   - get mngr account information - Local Group Memberships
+  - get HKEY_USERS Reg Values
 - Network information
   - netstat -nato
   - ipconfig /displaydns

@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.15
-:: Last-Update by krasimir.kumanov@gmail.com: 2019-05-25
+set _ScriptVersion=v1.16
+:: Last-Update by krasimir.kumanov@gmail.com: 2019-05-31
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -396,6 +396,7 @@ goto :eof
 	@goto :eof
 
 :GetReg
+	@echo.>> %_RegFile%
 	@echo ================================================================================== >> %_RegFile%
 	@echo ===== %time% : REG.EXE %* >> %_RegFile%
 	@echo ================================================================================== >> %_RegFile%
@@ -555,6 +556,33 @@ call :SleepX 1
 ENDLOCAL
 call :SleepX 1
 exit /b
+
+:GetHkeyUsersRegValues    -- GetHkeyUsersRegValues - output to _RegFile
+::                 -- %~1 [in,out,opt]: argument description here
+	SETLOCAL
+	call :InitLog !_RegFile!
+	for /f "tokens=2 delims=\" %%h in ('reg query hkey_users') do (
+		set _SID=%%h
+		reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\!_SID!" /v ProfileImagePath >NUL 2>&1
+		if "!errorlevel!"=="0" (
+			echo.>>!_RegFile!
+			echo @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@>>!_RegFile!
+			echo USER SID: !_SID!>>!_RegFile!
+			call :GetReg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\!_SID!" /v ProfileImagePath
+			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\International" /v LocaleName
+			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\International" /v sDecimal
+			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\Desktop" /v ForegroundLockTimeout
+			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\Desktop" /v WindowArrangementActive
+			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Windows\DWM" /v ColorPrevalence
+			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Avalon.Graphics" /v DisableHWAcceleration
+
+			)
+		)
+	(ENDLOCAL & REM -- RETURN VALUES
+		call :SleepX 1
+	)
+	exit /b
+
 
 :myFunctionName    -- function description here
 ::                 -- %~1 [in,out,opt]: argument description here
@@ -1073,6 +1101,12 @@ call :LogCmd !_localgroups! net localgroup "Local SecureComms Administrators"
 call :LogCmd !_localgroups! net localgroup "Local Supervisors"
 call :LogCmd !_localgroups! net localgroup "Local View Only Users"
 
+call :logitem . get HKEY_USERS Reg Values
+set _RegFile=!_DirWork!\RegistryInfo\_HKEY_USERS.txt
+call :mkNewDir !_DirWork!\RegistryInfo
+if exist !_RegFile! call :doit del "!_RegFile!"
+call :GetHkeyUsersRegValues
+
 
 :: get mngr account information - Local Group Memberships
 call :logitem . get mngr account information - Local Group Memberships
@@ -1513,7 +1547,7 @@ exit /b 1 -- no cab, end compress
 ::    get mngr account information - Local Group Memberships
 ::  - v1.14 groups membership changed to use 'net localgroup <GrpName>'
 ::  - v1.15 clientaccesspolicy.xml for Silverlight
-
+::  - v1.16 get HKEY_USERS Reg Values
 
 :: ToDo:
 
