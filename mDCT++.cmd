@@ -70,7 +70,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.16
+set _ScriptVersion=v1.17
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-05-31
 
 :: change the cmd prompt environment to English
@@ -580,6 +580,20 @@ exit /b
 		)
 	(ENDLOCAL & REM -- RETURN VALUES
 		call :SleepX 1
+	)
+	exit /b
+
+:GetUserSID    -- get user SID
+::             -- %~1 [in]: user name
+::             -- %~2 [out]: var SID
+	SETLOCAL
+	set _UserName=%~1
+	for /f "tokens=1* delims==" %%i in (
+	  'wmic useraccount where "name='!_UserName!'" get sid /value'
+	) do for /f "delims=" %%k in ("%%j") do set "_SID=%%k"
+
+	(ENDLOCAL & REM -- RETURN VALUES
+		IF "%~2" NEQ "" SET %~2=%_SID%
 	)
 	exit /b
 
@@ -1548,45 +1562,14 @@ exit /b 1 -- no cab, end compress
 ::  - v1.14 groups membership changed to use 'net localgroup <GrpName>'
 ::  - v1.15 clientaccesspolicy.xml for Silverlight
 ::  - v1.16 get HKEY_USERS Reg Values
+::  - v1.17 function GetUserSID
 
 :: ToDo:
-
-:: - [] McAfee - check reg key before
+:: - [] McAfee - check reg key before query
 ::    reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
 ::    if %ERRORLEVEL% EQU 0 goto :noMcAfeeScanner
-
 
 :: - [] Log and XML files from C:\Program Files\Honeywell\Experion PKS\Engineering Tools\temp\EMB.
 ::    The XML files contain the last asset, alarm group and system models that were downloaded to the server from the Enterprise Model Builder.
 ::    The log files contain any errors or warnings from these downloads
 
-:: - [x] Windows time
-::    w32tm /query /configuration /verbose
-::    w32tm /query /configuration
-::    reg query HKLM\SYSTEM\CurrentControlSet\Services\W32Time /s
-:: - [x] collect station configuration files
-::    - station configuration files (*.stn)
-::    - station toolbar files (*.stb)
-::    - Display Links files
-:: - [x] validate input parameters
-:: - [x] console troubleshooting
-::If using the Windows firewall, dump its configuration on Server and Console Station:
-::	netsh firewall show config >firewall.txt	(Included in DCT for 310+)
-::A dump of the following registry key from the Server and Console Station:
-::	HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\RPC
-:: - [x] Use the cstn_status tool to determine the current state (on console station)
-:: - [x] wmic nicconfig get
-:: - [x] Collect DCOM & TCP registry settings
-:: - [x] Delete source files, if compressed
-:: - [x] lisscn - change
-::    lisscn -chn n -all_ref > lisscn_all.txt
-::    lisscn -chn n > lisscn.txt
-:: - [x] get WindowsUpdate.log & ETL files
-:: - [x] Reg query power settings -> Turn off fast startup (/v HiberbootEnabled)
-::		reg query "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /s
-:: - [x] Add cabzip input parameter
-:: - [x] Add Experion license output infiormation (hwlictool.output.txt & liclist.output.txt)
-::      hwlictool list -format:xml >"c:\temp\test\hwlictool.output.txt" 2>&1
-:: - [x] Add usrlrn output
-:: - [x] xcopy command fixes
-:: - [x] fix mkCab
