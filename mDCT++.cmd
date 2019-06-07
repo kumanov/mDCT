@@ -70,7 +70,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.17
+set _ScriptVersion=v1.18
 :: Last-Update by krasimir.kumanov@gmail.com: 2019-05-31
 
 :: change the cmd prompt environment to English
@@ -1582,6 +1582,7 @@ exit /b 1 -- no cab, end compress
 ::  - v1.15 clientaccesspolicy.xml for Silverlight
 ::  - v1.16 get HKEY_USERS Reg Values
 ::  - v1.17 function GetUserSID
+::  - v1.18 Notification Utility - Dump indexes
 
 :: ToDo:
 :: - [] McAfee - check reg key before query
