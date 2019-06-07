@@ -440,7 +440,7 @@ EXIT /b
 	@goto :eof
 
 :DoGetSVC [comment] - UTILITY to dump Service information into log file
-	call :logitem .. collecting Services info at %~1
+	call :logitem collecting Services info at %~1
 	set _ServicesFile=!_DirWork!\GeneralSystemInfo\serviceslist.txt
 	call :InitLog !_ServicesFile!
 	call :LogCmd !_ServicesFile! SC.exe query type= all state= all
@@ -729,6 +729,16 @@ exit /b
 	if errorlevel 1 ( call :logitem failed: %* )
 	@goto :eof
 
+:ClearCaches - UTILITY to clear DNS, Netbios and Kerberos-Ticket Caches
+	call :logitem .. deleting DNS, NetBIOS and Kerberos caches
+	call :doCmd IPconfig /flushDNS
+	call :doCmd NBTstat -RR
+	call :doCmd %windir%\system32\KLIST.exe purge -li 0x3e7
+	call :doCmd %windir%\system32\KLIST.exe purge
+	::call :logitem .. deleting DFS cache
+	::call :doCmd DFSutil /PKTflush
+	@goto :eof
+
 :endregion
 
 :region DCT Data
@@ -955,12 +965,21 @@ if %errorlevel%==0 (
     call :logCmd !_DirWork!\ServerRunDirectory\usrlrn.txt usrlrn -p -a
 )
 
-where what >NUL 2>&1
+:: skip it - very slow and trigger AV scans
+::where what >NUL 2>&1
+::if %errorlevel%==0 (
+::	call :logitem What - Getting Experion exe/dll and source file information
+::	call :mkNewDir !_DirWork!\ServerRunDirectory
+::	call :InitLog !_DirWork!\ServerRunDirectory\what.output.txt
+::	for /r "%HwInstallPath%\Experion PKS\Server\run" %%a in (*.exe *.dll) do what "%%a" >>!_DirWork!\ServerRunDirectory\what.output.txt
+::)
+
+where notifdmp >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem What - Getting Experion exe/dll and source file information
-	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :InitLog !_DirWork!\ServerRunDirectory\what.output.txt
-	for /r "%HwInstallPath%\Experion PKS\Server\run" %%a in (*.exe *.dll) do what "%%a" >>!_DirWork!\ServerRunDirectory\what.output.txt
+	call :logitem Notification Utility - Dump indexes
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :InitLog !_DirWork!\ServerDataDirectory\notifindexes.output.txt
+    call :logCmd !_DirWork!\ServerDataDirectory\notifindexes.output.txt notifdmp --dump-indexes
 )
 
 
