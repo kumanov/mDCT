@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.18
-:: Last-Update by krasimir.kumanov@gmail.com: 2019-05-31
+set _ScriptVersion=v1.19
+:: Last-Update by krasimir.kumanov@gmail.com: 2019-06-15
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -800,6 +800,7 @@ for /r "%HwProgramData%\ProductConfig\FTE" %%g in (*.log) do (type %%g >"!_DirWo
 call :logitem get HMIWeb log files
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station-logs\"
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
+call :doCmd copy /y "%HwProgramData%\Experion PKS\Client\Station\PersistentDictionary.xml" !_DirWork!\Station-logs\
 
 call :logitem task list /services
 call :mkNewDir  !_DirWork!\ServerDataDirectory
@@ -1583,6 +1584,7 @@ exit /b 1 -- no cab, end compress
 ::  - v1.16 get HKEY_USERS Reg Values
 ::  - v1.17 function GetUserSID
 ::  - v1.18 Notification Utility - Dump indexes
+::  - v1.19 PersistentDictionary.xml
 
 :: ToDo:
 :: - [] McAfee - check reg key before query
