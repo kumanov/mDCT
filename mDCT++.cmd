@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.19
-:: Last-Update by krasimir.kumanov@gmail.com: 2019-06-15
+set _ScriptVersion=v1.20
+:: Last-Update by krasimir.kumanov@gmail.com: 2019-07-29
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -464,7 +464,7 @@ EXIT /b
 	set _HMIWebLog=%HwProgramData%\HMIWebLog\
 	@set _stnFiles=!_DirWork!\Station-logs\_stnFiles.txt
 	:: create stn file list
-	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_HMIWebLog! -Include log.txt,hmiweblogY*.txt -Recurse | Select-String -Pattern 'Connecting using .stn file: (.*stn)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file !_stnFiles!}}
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_HMIWebLog! -Include log.txt,hmiweblogY*.txt -Recurse | Select-String -Pattern 'Connecting using .stn file: (.*stn)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file !_stnFiles!  -Encoding unicode}}
 	:: copy files
 	for /f "tokens=* delims=" %%h in ('type !_stnFiles!') DO (
 		set _stnFile=_%%~nh%%~xh
@@ -800,7 +800,7 @@ for /r "%HwProgramData%\ProductConfig\FTE" %%g in (*.log) do (type %%g >"!_DirWo
 call :logitem get HMIWeb log files
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station-logs\"
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
-call :doCmd copy /y "%HwProgramData%\Experion PKS\Client\Station\PersistentDictionary.xml" !_DirWork!\Station-logs\
+call :doCmd copy /y "%HwProgramData%\HMIWebLog\PersistentDictionary.xml" !_DirWork!\Station-logs\
 
 call :logitem task list /services
 call :mkNewDir  !_DirWork!\ServerDataDirectory
@@ -813,7 +813,7 @@ if %errorlevel%==0 (
 	call :LogCmd !_DirWork!\SloggerLogs\setpar.active.txt setpar /active
 )
 
-(::SloggerLogs
+::SloggerLogs
 :: R5xx
 if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 	call :logitem get Experion log files
@@ -831,7 +831,7 @@ if exist "%HwProgramData%\Experion PKS\Server\data\log.txt" (
 	call :logitem get Experion log files
 	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\*log*.txt" "!_DirWork!\SloggerLogs\"
 )
-)
+
 
 if exist "%HWCONFIGSTUDIOLOGPATH%\Configuration Studio.log" (
 	call :mkNewDir !_DirWork!\Configuration Studio
@@ -1062,7 +1062,7 @@ call :logitem . WMI Root Security Descriptor
 call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt /namespace:\\root path __systemsecurity call GetSecurityDescriptor
 
 :: AV on accesss scanner settings
-call :doCmd REG EXPORT "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\HKLM_McAfee_OnAccessScanner.txt
+call :doCmd REG EXPORT "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
 
 set _SecurityFile=!_DirWork!\GeneralSystemInfo\_SecurityCfg.txt
 call :InitLog !_SecurityFile!
@@ -1096,6 +1096,7 @@ call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY  "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
+call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers
 
 call :logOnlyItem . Windows Time status/settings
 set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
@@ -1148,6 +1149,12 @@ set _mngrUserAccount=!_DirWork!\GeneralSystemInfo\_mngrUserAccount.txt
 call :InitLog !_mngrUserAccount!
 call :LogCmd !_mngrUserAccount! net user mngr
 
+:: MiniFilter drivers
+call :logitem . MiniFilter drivers
+set _fltmc=!_DirWork!\GeneralSystemInfo\_fltmc.output.txt
+call :InitLog !_fltmc!
+call :LogCmd !_fltmc! FLTMC
+call :LogCmd !_fltmc! fltmc instances
 
 goto :eof
 :endregion Windows
@@ -1239,6 +1246,7 @@ call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\Tcpip6\Parameters" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\tcpipreg" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\iphlpsvc" /s
+call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Network" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002bE10318}" /s
 
 call :logitem . wmic nic/nicconfig get
