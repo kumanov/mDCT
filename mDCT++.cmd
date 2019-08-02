@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.20
-:: Last-Update by krasimir.kumanov@gmail.com: 2019-07-29
+set _ScriptVersion=v1.21
+:: Last-Update by krasimir.kumanov@gmail.com: 2019-07-30
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -1037,8 +1037,10 @@ call :LogCmd !_powerCfgFile! powercfg -Q
 :: reg query power settings
 call :logOnlyItem . reg query power settings
 set _RegFile=!_powerCfgFile!
-call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"  /s /t reg_dword
 ::  fast reboot - "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled
+call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"  /s /t reg_dword
+::  Hibernate - "HKLM\System\CurrentControlSet\Control\Power" /v HibernateEnabled
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Power"  /s /t reg_dword
 
 call :logitem . collecting Quick Fix Engineering information (Hotfixes)
 call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_Hotfixes.txt qfe list
@@ -1096,7 +1098,7 @@ call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY  "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
-call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers
+call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers"
 
 call :logOnlyItem . Windows Time status/settings
 set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
@@ -1593,6 +1595,10 @@ exit /b 1 -- no cab, end compress
 ::  - v1.17 function GetUserSID
 ::  - v1.18 Notification Utility - Dump indexes
 ::  - v1.19 PersistentDictionary.xml
+::  - v1.20 list mini filter drivers
+::  - v1.21 reg query
+::    HKLM\System\CurrentControlSet\Control\GraphicsDrivers
+::    HKLM\System\CurrentControlSet\Control\Power" /v HibernateEnabled
 
 :: ToDo:
 :: - [] McAfee - check reg key before query
