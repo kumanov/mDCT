@@ -366,7 +366,7 @@ goto :eof
 			echo !_line!>>"!_LogFileName!"
 		)
 	)
-	@echo. >> "!_LogFileName!"
+	@echo.>> "!_LogFileName!"
 	call :SleepX 1
 	ENDLOCAL
 	@goto :eof
@@ -1243,6 +1243,7 @@ call :LogCmd !_NetCmdFile! NET STATISTICS SERVER
 
 set _RegFile=!_DirWork!\_Network\TcpIpParameters.txt
 call :InitLog !_RegFile!
+call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Services\FTEMUXMP" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /v ArpRetryCount
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\Tcpip6\Parameters" /s
@@ -1255,7 +1256,7 @@ call :logitem . wmic nic/nicconfig get
 set _NicConfig=!_DirWork!\_Network\nicconfig.txt
 call :InitLog !_NicConfig!
 call :LogWmicCmd !_NicConfig! wmic nic get
-call :LogWmicCmd !_NicConfig! wmic nicconfig get Description,DHCPEnabled,Index,InterfaceIndex,IPEnabled,MACAddress
+call :LogWmicCmd !_NicConfig! wmic nicconfig get Description,DHCPEnabled,Index,InterfaceIndex,IPEnabled,MACAddress,SettingID
 call :LogWmicCmd !_NicConfig! wmic nicconfig get
 
 
