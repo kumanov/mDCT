@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.21
-:: Last-Update by krasimir.kumanov@gmail.com: 2019-07-30
+set _ScriptVersion=v1.22
+:: Last-Update by krasimir.kumanov@gmail.com: 06-Aug-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -110,6 +110,16 @@ call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersio
 
 :: VEP
 	@set _VEP=
+
+:: HSCServerType
+	@set _HSCServerType=
+	(for /f "tokens=2,* delims= " %%h in ('reg query "HKLM\SOFTWARE\Wow6432Node\Honeywell" /v HSCServerType ^| find /i "Server"') do @set _HSCServerType=%%i) 2>NUL
+	:: is Server
+	if NOT "%_HSCServerType%"=="%_HSCServerType:Server=%" (
+		@set _isServer=1
+	) else (
+		@set _isServer=
+	)
 
 :endregion Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -1093,12 +1103,17 @@ set _RegFile=!_DirWork!\RegistryInfo\_OLE_registry_settings.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\Software\Microsoft\OLE" /s
 
+call :logOnlyItem . reg query Graphics Drivers
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile=!_DirWork!\RegistryInfo\_GraphicsDrivers.txt
+call :InitLog !_RegFile!
+call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
+
 call :logOnlyItem . reg query misc
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY  "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
-call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers"
 
 call :logOnlyItem . Windows Time status/settings
 set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
@@ -1296,14 +1311,6 @@ goto :eof
 :ExperionAddData
 call :logitem * Experion data *
 
-where lisscn >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem . lisscn output
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd lisscn -all_ref -OUT !_DirWork!\ServerDataDirectory\_lisscn_all.txt
-	call :doCmd lisscn -OUT !_DirWork!\ServerDataDirectory\_lisscn.txt
-)
-
 where filfrag >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem . filfrag output
@@ -1318,12 +1325,22 @@ if exist "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" (
 	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" !_DirWork!\ServerDataDirectory\_mapping.tps.xml
 )
 
-where dsasublist >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem . dsasublist
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :InitLog !_DirWork!\ServerDataDirectory\_dsasublist.txt
-    call :logCmd !_DirWork!\ServerDataDirectory\_dsasublist.txt dsasublist
+if defined _isServer (
+	where lisscn >NUL 2>&1
+	if %errorlevel%==0 (
+		call :logitem . lisscn output
+		call :mkNewDir !_DirWork!\ServerDataDirectory
+		call :doCmd lisscn -all_ref -OUT !_DirWork!\ServerDataDirectory\_lisscn_all.txt
+		call :doCmd lisscn -OUT !_DirWork!\ServerDataDirectory\_lisscn.txt
+	)
+
+	where dsasublist >NUL 2>&1
+	if %errorlevel%==0 (
+		call :logitem . dsasublist
+		call :mkNewDir !_DirWork!\ServerDataDirectory
+		call :InitLog !_DirWork!\ServerDataDirectory\_dsasublist.txt
+		call :logCmd !_DirWork!\ServerDataDirectory\_dsasublist.txt dsasublist
+	)
 )
 
 (::CrashDumps - file list & reg settings
@@ -1600,6 +1617,10 @@ exit /b 1 -- no cab, end compress
 ::  - v1.21 reg query
 ::    HKLM\System\CurrentControlSet\Control\GraphicsDrivers
 ::    HKLM\System\CurrentControlSet\Control\Power" /v HibernateEnabled
+::  - v1.22
+::    reg query "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
+::    _HSCServerType
+::    _isServer
 
 :: ToDo:
 :: - [] McAfee - check reg key before query
