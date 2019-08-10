@@ -121,6 +121,15 @@ call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersio
 		@set _isServer=
 	)
 
+:: TPSNodeInstallation
+	reg query "HKLM\SOFTWARE\WOW6432Node\Honeywell" /v TPSNodeInstallation >NUL 2>&1
+	if errorlevel 1 (
+		@set _isTPS=
+	) else (
+		@set _isTPS=1
+	)
+
+
 :endregion Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :region parse args
@@ -282,8 +291,8 @@ goto :eof
 @echo.The script will colect DCT data (not all), PerfMon Logs (last 10 days), list of crash dumps (only list, no dmp files) and additional diagnostic data
 @echo.The data will be archived in .cab or .zip file with name [hostName]_[Date]_[Time].cab/zip and working files will be deleted
 @echo.This is default behaviour when running without paramaters. To change it you can run script with any of below parameters
-@echo.  noDctData - skip collection of DCT data 
-@echo.  noPerfMon - skip Performance Counter colection - *.blg files 
+@echo.  noDctData - skip collection of DCT data
+@echo.  noPerfMon - skip Performance Counter colection - *.blg files
 @echo.  noAddData - skip colection of the addtional diagnostic data
 @echo.  noCabZip  - the data collected will not be compressed
 @echo.Usage examples:
@@ -584,7 +593,11 @@ exit /b
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\Desktop" /v ForegroundLockTimeout
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\Desktop" /v WindowArrangementActive
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Windows\DWM" /v ColorPrevalence
-			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Avalon.Graphics" /v DisableHWAcceleration
+			if NOT "_VEP"="1" (
+				if NOT "_isServer"="1" (
+					call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Avalon.Graphics" /v DisableHWAcceleration
+				)
+			)
 
 			)
 		)
@@ -1074,7 +1087,11 @@ call :logitem . WMI Root Security Descriptor
 call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt /namespace:\\root path __systemsecurity call GetSecurityDescriptor
 
 :: AV on accesss scanner settings
-call :doCmd REG EXPORT "HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
+reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
+if %ERRORLEVEL% EQU 0 (
+	::call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
+	call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
+)
 
 set _SecurityFile=!_DirWork!\GeneralSystemInfo\_SecurityCfg.txt
 call :InitLog !_SecurityFile!
@@ -1275,7 +1292,7 @@ call :LogWmicCmd !_NicConfig! wmic nicconfig get Description,DHCPEnabled,Index,I
 call :LogWmicCmd !_NicConfig! wmic nicconfig get
 
 
-call :logitem . msft_providers get Provider,HostProcessIdentifier 
+call :logitem . msft_providers get Provider,HostProcessIdentifier
 call :InitLog !_DirWork!\_Network\msft_providers.txt
 call :LogWmicCmd !_DirWork!\_Network\msft_providers.txt wmic path msft_providers get Provider,HostProcessIdentifier
 
@@ -1293,7 +1310,7 @@ if exist "c:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe" (
 	)
 )
 
-call :logitem . get NetTcpPortSharing config file 
+call :logitem . get NetTcpPortSharing config file
 for /f "usebackq skip=1" %%h in (`wmic service where "name='NetTcpPortSharing'" get PathName`) do (
 	if exist "%%h.config" (
 		call :doCmd copy /y "%%h.config" "!_DirWork!\_Network\"
@@ -1349,7 +1366,7 @@ call :mkNewDir !_DirWork!\CrashDumps
 set _CrashDumpsList=!_DirWork!\CrashDumps\_CrashDumpsList.txt
 call :InitLog !_CrashDumpsList!
 call :logCmd  !_CrashDumpsList! dir %windir%\memory.dmp
-call :logCmd  !_CrashDumpsList! dir /o:-d %windir%\Minidump
+call :logCmd  !_CrashDumpsList! dir /o:-d %windir%\Minidump\
 call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
 call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
 call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
@@ -1415,6 +1432,18 @@ if exist "%HwProgramData%\Experion PKS\Client\Station\station.ini" (
 if exist "%HwProgramData%\HMIWebLog\Log.txt" (
 	call :logitem . collect station configuration files
 	call :getStationFiles
+)
+
+if "%_isTPS%"=="1" (
+	call :logitem . chkem /tpspoints
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :logCmd !_DirWork!\ServerRunDirectory\_tpspoints.txt chkem /tpspoints
+
+	if "%_isServer%"=="1" (
+		call :logitem . chkem /tpsmappings
+		call :mkNewDir !_DirWork!\ServerRunDirectory
+		call :logCmd !_DirWork!\ServerRunDirectory\_tpsmappings.txt chkem /tpsmappings
+	)
 )
 
 where bckbld >NUL 2>&1
@@ -1621,13 +1650,9 @@ exit /b 1 -- no cab, end compress
 ::    reg query "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
 ::    _HSCServerType
 ::    _isServer
-
-:: ToDo:
-:: - [] McAfee - check reg key before query
-::    reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
-::    if %ERRORLEVEL% EQU 0 goto :noMcAfeeScanner
-
-:: - [] Log and XML files from C:\Program Files\Honeywell\Experion PKS\Engineering Tools\temp\EMB.
-::    The XML files contain the last asset, alarm group and system models that were downloaded to the server from the Enterprise Model Builder.
-::    The log files contain any errors or warnings from these downloads
-
+::    _isTPS
+::    reg query "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
+::    .\Avalon.Graphics\DisableHWAcceleration - skip on VEP and servers
+::    chkem /tpspoints
+::    chkem /tpsmappings
+::    McAfee_OnAccessScanner - verify reg exists before export

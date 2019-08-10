@@ -55,6 +55,7 @@ Usage examples:
     - HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC
     - HKLM\Software\Microsoft\RPC
     - HKLM\Software\Microsoft\OLE
+    - HKLM\System\CurrentControlSet\Control\GraphicsDrivers
     - reg query misc
       - "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
   - Windows Time status/settings
@@ -126,3 +127,5 @@ Usage examples:
     - station toolbar files (*.stb)
     - Display Links files
   - Backbuild history assignments
+  - chkem /tpspoints
+  - chkem /tpsmappings
