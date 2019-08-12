@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.22
-:: Last-Update by krasimir.kumanov@gmail.com: 06-Aug-2019
+set _ScriptVersion=v1.23
+:: Last-Update by krasimir.kumanov@gmail.com: 12-Aug-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -593,8 +593,8 @@ exit /b
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\Desktop" /v ForegroundLockTimeout
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\Desktop" /v WindowArrangementActive
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Windows\DWM" /v ColorPrevalence
-			if NOT "_VEP"="1" (
-				if NOT "_isServer"="1" (
+			if NOT "_VEP"=="1" (
+				if NOT "_isServer"=="1" (
 					call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Avalon.Graphics" /v DisableHWAcceleration
 				)
 			)
@@ -620,6 +620,38 @@ exit /b
 	)
 	exit /b
 
+:ExperionAclVerify    -- Experion Acl Verify
+	SETLOCAL
+	set _AclVerify=!_DirWork!\GeneralSystemInfo\_AclHwVerify.txt
+	call :InitLog !_AclVerify!
+	call :logitem . Experion ACL Verify - "%HwInstallPath%"
+	@echo.>>!_AclVerify! 
+	@echo ================================================================================== >>!_AclVerify!
+	@echo ===== ICACLS "%HwInstallPath%" /verify /T /C /L /Q >>!_AclVerify!
+	@echo ================================================================================== >>!_AclVerify!
+	ICACLS "%HwInstallPath%" /verify /T /C /L /Q >>!_AclVerify!
+	@echo.>>!_AclVerify! 
+	
+	call :logitem . Experion ACL Verify - "%HwProgramData%"
+	call :LogCmd !_AclVerify! ICACLS "%HwProgramData%" /verify /T /C /L /Q
+	
+	call :logitem . Experion ACL Verify - HKLM:\SOFTWARE\Honeywell\
+	@echo.>>!_AclVerify! 
+	@echo ================================================================================== >>!_AclVerify!
+	@echo ===== Get-Acl HKLM:\SOFTWARE\Honeywell\ >>!_AclVerify!
+	@echo ================================================================================== >>!_AclVerify!
+	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
+	
+	call :logitem . Experion ACL Verify - HKLM:\SOFTWARE\Wow6432Node\Honeywell\
+	@echo.>>!_AclVerify!
+	@echo ================================================================================== >>!_AclVerify!
+	@echo ===== Get-Acl HKLM:\SOFTWARE\Wow6432Node\Honeywell\ >>!_AclVerify!
+	@echo ================================================================================== >>!_AclVerify!
+	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Wow6432Node\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
+
+	(ENDLOCAL & REM -- RETURN VALUES
+	)
+	exit /b
 
 :myFunctionName    -- function description here
 ::                 -- %~1 [in,out,opt]: argument description here
@@ -983,7 +1015,7 @@ if %errorlevel%==0 (
 
 where usrlrn >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem usrlrn usrlrn -p -a
+	call :logitem usrlrn -p -a
 	call :mkNewDir !_DirWork!\ServerRunDirectory
 	call :InitLog !_DirWork!\ServerRunDirectory\usrlrn.txt
     call :logCmd !_DirWork!\ServerRunDirectory\usrlrn.txt usrlrn -p -a
@@ -1189,6 +1221,9 @@ set _fltmc=!_DirWork!\GeneralSystemInfo\_fltmc.output.txt
 call :InitLog !_fltmc!
 call :LogCmd !_fltmc! FLTMC
 call :LogCmd !_fltmc! fltmc instances
+
+:: Experion ACL Verify
+call :ExperionAclVerify
 
 goto :eof
 :endregion Windows
@@ -1647,12 +1682,11 @@ exit /b 1 -- no cab, end compress
 ::    HKLM\System\CurrentControlSet\Control\GraphicsDrivers
 ::    HKLM\System\CurrentControlSet\Control\Power" /v HibernateEnabled
 ::  - v1.22
-::    reg query "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
 ::    _HSCServerType
 ::    _isServer
 ::    _isTPS
-::    reg query "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
 ::    .\Avalon.Graphics\DisableHWAcceleration - skip on VEP and servers
 ::    chkem /tpspoints
 ::    chkem /tpsmappings
 ::    McAfee_OnAccessScanner - verify reg exists before export
+::  - v1.23 - Experion ACL Verify

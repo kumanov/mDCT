@@ -66,6 +66,7 @@ Usage examples:
   - get members of Experion groups
   - get mngr account information - Local Group Memberships
   - get HKEY_USERS Reg Values
+  - Experion ACL Verify
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -122,7 +123,7 @@ Usage examples:
   - shheap 1 check output
   - list disk resident heap files
   - copy station.ini file
-  = collect station configuration files
+  - collect station configuration files
     - station configuration files (*.stn)
     - station toolbar files (*.stb)
     - Display Links files
