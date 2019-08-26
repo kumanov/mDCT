@@ -70,7 +70,7 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.23
+set _ScriptVersion=v1.24
 :: Last-Update by krasimir.kumanov@gmail.com: 12-Aug-2019
 
 :: change the cmd prompt environment to English
@@ -391,8 +391,10 @@ goto :eof
 	@goto :eof
 
 :mkNewDir
-	set _MS_NewDir=%*
-	if not exist "%_MS_NewDir%" mkdir "%_MS_NewDir%"
+	SETLOCAL
+	set _NewDir=%*
+	if not exist "%_NewDir%" mkdir "%_NewDir%"
+	ENDLOCAL & REM -- RETURN VALUES
 	@goto :eof
 
 :WriteHost [ forground background message]
@@ -592,6 +594,9 @@ exit /b
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\International" /v sDecimal
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\Desktop" /v ForegroundLockTimeout
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Control Panel\Desktop" /v WindowArrangementActive
+			:: R4xx - Configure for best performance
+			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v VisualFXSetting
+			:: R5xx - Setting Windows ColorPrelevance (making active window title bar to change its color)
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Windows\DWM" /v ColorPrevalence
 			if NOT "_VEP"=="1" (
 				if NOT "_isServer"=="1" (
@@ -810,7 +815,7 @@ call :logitem MSInfo32 report
 call :doCmd msinfo32 /report !_DirWork!\GeneralSystemInfo\MSInfo32.txt
 
 call :logitem Windows hosts file copy
-call :doCmd copy /y %windir%\System32\drivers\etc\hosts !_DirWork!\GeneralSystemInfo\
+call :doCmd copy /y %windir%\System32\drivers\etc\hosts "!_DirWork!\GeneralSystemInfo\"
 
 call :logitem ipconfig output
 call :LogCmd !_DirWork!\GeneralSystemInfo\ipconfig.txt ipconfig /all
@@ -834,7 +839,7 @@ call :doCmd wevtutil epl Security !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Se
 call :doCmd wevtutil epl System !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.evtx /overwrite:true)
 
 call :logitem get Experion PKS Product Version file
-call :doCmd copy /y "%HwInstallPath%\Experion PKS\ProductVersion.txt" !_DirWork!\GeneralSystemInfo\
+call :doCmd copy /y "%HwInstallPath%\Experion PKS\ProductVersion.txt" "!_DirWork!\GeneralSystemInfo\"
 
 call :logitem query services
 call :DoGetSVC %time%
@@ -855,7 +860,7 @@ for /r "%HwProgramData%\ProductConfig\FTE" %%g in (*.log) do (type %%g >"!_DirWo
 call :logitem get HMIWeb log files
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station-logs\"
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
-call :doCmd copy /y "%HwProgramData%\HMIWebLog\PersistentDictionary.xml" !_DirWork!\Station-logs\
+call :doCmd copy /y "%HwProgramData%\HMIWebLog\PersistentDictionary.xml" "!_DirWork!\Station-logs\"
 
 call :logitem task list /services
 call :mkNewDir  !_DirWork!\ServerDataDirectory
@@ -977,19 +982,19 @@ if %errorlevel%==0 (
 if exist "%HwProgramData%\Experion PKS\Server\data\system.build" (
 	call :logitem copy system.build file
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\system.build" !_DirWork!\ServerDataDirectory\
+	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\system.build" "!_DirWork!\ServerDataDirectory\"
 )
 
 if exist "%HwProgramData%\Experion PKS\Server\data\" (
 	call :logitem collect bad files .\server\data\*.bad
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\*.bad" !_DirWork!\ServerDataDirectory\
+	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\*.bad" "!_DirWork!\ServerDataDirectory\"
 )
 
 if exist "%HwProgramData%\TPNServer\TPNServer.log" (
 	call :logitem copy TPNServer.log file
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd copy /y "%HwProgramData%\TPNServer\TPNServer.log" !_DirWork!\ServerDataDirectory\
+	call :doCmd copy /y "%HwProgramData%\TPNServer\TPNServer.log" "!_DirWork!\ServerDataDirectory\"
 )
 
 (::winsxs
@@ -1225,6 +1230,18 @@ call :LogCmd !_fltmc! fltmc instances
 :: Experion ACL Verify
 call :ExperionAclVerify
 
+:: diskdrive status
+if not "%_VEP%"=="1" (
+	call :logitem . diskdrive status
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo
+	set _diskdrive=!_DirWork!\GeneralSystemInfo\_diskdrive.txt
+	call :InitLog !_diskdrive!
+	@echo wmic diskdrive get InterfaceType,MediaType,Model,Size,Status>>!_diskdrive!
+	@echo The Status property will return "Pred Fail" if your drive's death is imminent, or "OK" if it thinks the drive is doing fine.>>!_diskdrive!
+	@echo.>>!_diskdrive!
+	wmic diskdrive get InterfaceType,MediaType,Model,Size,Status | more /s >>!_diskdrive!
+)
+
 goto :eof
 :endregion Windows
 
@@ -1353,7 +1370,7 @@ for /f "usebackq skip=1" %%h in (`wmic service where "name='NetTcpPortSharing'" 
 	)
 
 call :logitem . get clientaccesspolicy.xml for Silverlight
-powershell -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
 call :SleepX 1
 
 goto :eof
@@ -1363,18 +1380,20 @@ goto :eof
 :ExperionAddData
 call :logitem * Experion data *
 
-where filfrag >NUL 2>&1
-if %errorlevel%==0 (
-	call :logitem . filfrag output
-	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :InitLog !_DirWork!\ServerDataDirectory\_filfrag.output.txt
-    call :logCmd !_DirWork!\ServerDataDirectory\_filfrag.output.txt filfrag
+if NOT "!_VEP!"=="1" (
+	where filfrag >NUL 2>&1
+	if %errorlevel%==0 (
+		call :logitem . filfrag output
+		call :mkNewDir !_DirWork!\ServerDataDirectory
+		call :InitLog !_DirWork!\ServerDataDirectory\_filfrag.output.txt
+		call :logCmd !_DirWork!\ServerDataDirectory\_filfrag.output.txt filfrag
+	)
 )
 
 if exist "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" (
 	call :logitem . copy .\mapping\tps.xml
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" !_DirWork!\ServerDataDirectory\_mapping.tps.xml
+	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" "!_DirWork!\ServerDataDirectory\_mapping.tps.xml"
 )
 
 if defined _isServer (
@@ -1461,7 +1480,7 @@ call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgr
 if exist "%HwProgramData%\Experion PKS\Client\Station\station.ini" (
 	call :logitem . copy station.ini file
 	call :mkNewDir !_DirWork!\Station-logs
-	call :doCmd copy /y "%HwProgramData%\Experion PKS\Client\Station\station.ini" !_DirWork!\Station-logs\_station.ini
+	call :doCmd copy /y "%HwProgramData%\Experion PKS\Client\Station\station.ini" "!_DirWork!\Station-logs\_station.ini"
 )
 
 if exist "%HwProgramData%\HMIWebLog\Log.txt" (
@@ -1690,3 +1709,8 @@ exit /b 1 -- no cab, end compress
 ::    chkem /tpsmappings
 ::    McAfee_OnAccessScanner - verify reg exists before export
 ::  - v1.23 - Experion ACL Verify
+::  - v1.24 :
+::    skip filfrag on VEP
+::    "HKEY_USERS\!_SID!\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v VisualFXSetting
+::    fix copy command - destination in quotes
+::    diskdrive status

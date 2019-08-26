@@ -67,6 +67,7 @@ Usage examples:
   - get mngr account information - Local Group Memberships
   - get HKEY_USERS Reg Values
   - Experion ACL Verify
+  - diskdrive status
 - Network information
   - netstat -nato
   - ipconfig /displaydns
