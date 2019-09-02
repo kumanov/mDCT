@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.24
-:: Last-Update by krasimir.kumanov@gmail.com: 12-Aug-2019
+set _ScriptVersion=v1.25
+:: Last-Update by krasimir.kumanov@gmail.com: 27-Aug-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -864,7 +864,7 @@ call :doCmd copy /y "%HwProgramData%\HMIWebLog\PersistentDictionary.xml" "!_DirW
 
 call :logitem task list /services
 call :mkNewDir  !_DirWork!\ServerDataDirectory
-call :LogCmd !_DirWork!\ServerDataDirectory\TaskList.txt tasklist /fo csv /svc
+call :LogCmd !_DirWork!\ServerDataDirectory\TaskList.txt tasklist /v /fo csv /svc
 
 where setpar >NUL 2>&1
 if %errorlevel%==0 (
@@ -1016,7 +1016,7 @@ if %errorlevel%==0 (
 	call :mkNewDir !_DirWork!\ServerRunDirectory
 	call :InitLog !_DirWork!\ServerRunDirectory\hwlictool.output.txt
     call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool export -format:xml
-)
+    call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool status -format:xml
 
 where usrlrn >NUL 2>&1
 if %errorlevel%==0 (
@@ -1714,3 +1714,5 @@ exit /b 1 -- no cab, end compress
 ::    "HKEY_USERS\!_SID!\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v VisualFXSetting
 ::    fix copy command - destination in quotes
 ::    diskdrive status
+::  - v1.25 :
+::    hwlictool status -format:xml
