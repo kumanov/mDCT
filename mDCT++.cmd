@@ -611,7 +611,7 @@ exit /b
 	)
 	exit /b
 
-:GetUserSID    -- get user SID
+:GetUserSID~   -- get user SID
 ::             -- %~1 [in]: user name
 ::             -- %~2 [out]: var SID
 	SETLOCAL
@@ -622,6 +622,19 @@ exit /b
 
 	(ENDLOCAL & REM -- RETURN VALUES
 		IF "%~2" NEQ "" SET %~2=%_SID%
+	)
+	exit /b
+
+:GetUserSID    -- get user SID
+::             -- %~1 [in]: user name
+::             -- %~2 [out]: var SID
+	SETLOCAL
+	set __UserName=%~1
+	for /f "usebackq delims=" %%h in (`PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { (New-Object System.Security.Principal.NTAccount '!__UserName!').Translate([System.Security.Principal.SecurityIdentifier]).Value }}"`) do set "__SID=%%h"
+
+	(ENDLOCAL & REM -- RETURN VALUES
+		IF "%~2" NEQ "" (SET %~2=%__SID%
+		) else (echo %__SID%)
 	)
 	exit /b
 
@@ -864,7 +877,7 @@ call :doCmd copy /y "%HwProgramData%\HMIWebLog\PersistentDictionary.xml" "!_DirW
 
 call :logitem task list /services
 call :mkNewDir  !_DirWork!\ServerDataDirectory
-call :LogCmd !_DirWork!\ServerDataDirectory\TaskList.txt tasklist /v /fo csv /svc
+call :LogCmd !_DirWork!\ServerDataDirectory\TaskList.txt tasklist /svc
 
 where setpar >NUL 2>&1
 if %errorlevel%==0 (
@@ -1017,7 +1030,7 @@ if %errorlevel%==0 (
 	call :InitLog !_DirWork!\ServerRunDirectory\hwlictool.output.txt
     call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool export -format:xml
     call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool status -format:xml
-
+)
 where usrlrn >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem usrlrn -p -a
@@ -1193,7 +1206,7 @@ if not "%_VEP%"=="1" (
 :: get GDI Handles Count
 call :getGDIHandlesCount
 
-
+(::localgroups
 call :logitem . get members of Experion groups
 set _localgroups=!_DirWork!\GeneralSystemInfo\_localgroupsExperion.txt
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
@@ -1206,6 +1219,7 @@ call :LogCmd !_localgroups! net localgroup "Local Operators"
 call :LogCmd !_localgroups! net localgroup "Local SecureComms Administrators"
 call :LogCmd !_localgroups! net localgroup "Local Supervisors"
 call :LogCmd !_localgroups! net localgroup "Local View Only Users"
+)
 
 call :logitem . get HKEY_USERS Reg Values
 set _RegFile=!_DirWork!\RegistryInfo\_HKEY_USERS.txt
@@ -1241,6 +1255,18 @@ if not "%_VEP%"=="1" (
 	@echo.>>!_diskdrive!
 	wmic diskdrive get InterfaceType,MediaType,Model,Size,Status | more /s >>!_diskdrive!
 )
+
+
+call :logitem task list /verbose
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :LogCmd !_DirWork!\GeneralSystemInfo\_TaskList.csv tasklist /v /fo csv
+
+call :logitem query information about processes, sessions, and RD Session Host servers
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output QUERY USER
+call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output QUERY SESSION
+call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output QUERY TERMSERVER
+call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output QUERY PROCESS
 
 goto :eof
 :endregion Windows
@@ -1716,3 +1742,5 @@ exit /b 1 -- no cab, end compress
 ::    diskdrive status
 ::  - v1.25 :
 ::    hwlictool status -format:xml
+::    tasklist /v /fo csv
+::    query information about processes, sessions, and RD Session Host servers
