@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.25
-:: Last-Update by krasimir.kumanov@gmail.com: 27-Aug-2019
+set _ScriptVersion=v1.26
+:: Last-Update by krasimir.kumanov@gmail.com: 05-Oct-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -382,7 +382,7 @@ goto :eof
 		For /F "tokens=* delims=" %%h in ('%%b') do (
 			set "_line=%%h"
 			set "_line=!_line:~0,-1!"
-			echo !_line!>>"!_LogFileName!"
+			echo.!_line!>>"!_LogFileName!"
 		)
 	)
 	@echo.>> "!_LogFileName!"
@@ -1136,11 +1136,19 @@ if exist %windir%\Logs\WindowsUpdate (
 call :logitem . WMI Root Security Descriptor
 call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt /namespace:\\root path __systemsecurity call GetSecurityDescriptor
 
-:: AV on accesss scanner settings
+:: McAfee on accesss scanner settings
 reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
 	::call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
 	call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
+)
+
+:: Symantec\Symantec Endpoint Protection\AV
+reg query "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" >NUL 2>&1
+if %ERRORLEVEL% EQU 0 (
+	set _RegFile=!_DirWork!\RegistryInfo\_Symantec_SEP_AV.txt
+	call :InitLog !_RegFile!
+	call :GetReg QUERY "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" /s
 )
 
 set _SecurityFile=!_DirWork!\GeneralSystemInfo\_SecurityCfg.txt
@@ -1263,10 +1271,10 @@ call :LogCmd !_DirWork!\GeneralSystemInfo\_TaskList.csv tasklist /v /fo csv
 
 call :logitem query information about processes, sessions, and RD Session Host servers
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
-call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output QUERY USER
-call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output QUERY SESSION
-call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output QUERY TERMSERVER
-call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output QUERY PROCESS
+call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY USER
+call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY SESSION
+call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY TERMSERVER
+call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY PROCESS
 
 goto :eof
 :endregion Windows
@@ -1396,7 +1404,7 @@ for /f "usebackq skip=1" %%h in (`wmic service where "name='NetTcpPortSharing'" 
 	)
 
 call :logitem . get clientaccesspolicy.xml for Silverlight
-PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml -UseBasicParsing).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
 call :SleepX 1
 
 goto :eof
@@ -1744,3 +1752,8 @@ exit /b 1 -- no cab, end compress
 ::    hwlictool status -format:xml
 ::    tasklist /v /fo csv
 ::    query information about processes, sessions, and RD Session Host servers
+::  - v1.26 :
+::    reg query "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV"
+::    fif ECHO is off. in wmic output
+::    added -UseBasicParsing in Invoke-WebRequest
+::    - The response content cannot be parsed because the Internet Explorer engine is not available, or Internet Explorer's first-launch configuration is not complete. Specify the UseBasicParsing parameter and try again.

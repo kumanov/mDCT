@@ -56,6 +56,8 @@ Usage examples:
     - HKLM\Software\Microsoft\RPC
     - HKLM\Software\Microsoft\OLE
     - HKLM\System\CurrentControlSet\Control\GraphicsDrivers
+    - McAfee VSE onaccess scanner settings
+    - Symantec SEP AV settings
     - reg query misc
       - "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
   - Windows Time status/settings
