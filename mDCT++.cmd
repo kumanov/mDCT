@@ -1544,6 +1544,20 @@ if %errorlevel%==0 (
     call :doCmd bckbld -np -nt -ng -ns -tag PSA -out !_DirWork!\ServerDataDirectory\_hist_psa.txt
 )
 
+:: HKLM\SOFTWARE\classes\Hw...
+if defined _isServer (
+	call :logOnlyItem . reg query HKEY_LOCAL_MACHINE\SOFTWARE\classes\Hw...
+	call :mkNewDir  !_DirWork!\RegistryInfo
+	set _RegFile=!_DirWork!\RegistryInfo\_HKLM_SOFTWARE_Classes_Experion.txt
+	call :InitLog !_RegFile!
+	call :GetReg QUERY "HKLM\SOFTWARE\classes\HwHsc.OPCServer" /s
+	call :GetReg QUERY "HKLM\SOFTWARE\classes\HwHsc.OPCServer2" /s
+	call :GetReg QUERY "HKLM\SOFTWARE\classes\HwHsc.OPCServer3" /s
+	call :GetReg QUERY "HKLM\SOFTWARE\classes\HwHsc.OPCServer4" /s
+	call :GetReg QUERY "HKLM\SOFTWARE\classes\HwHsc.OPCServer5" /s
+)
+
+
 goto :eof
 :endregion ExperionAddData
 
@@ -1757,3 +1771,4 @@ exit /b 1 -- no cab, end compress
 ::    fif ECHO is off. in wmic output
 ::    added -UseBasicParsing in Invoke-WebRequest
 ::    - The response content cannot be parsed because the Internet Explorer engine is not available, or Internet Explorer's first-launch configuration is not complete. Specify the UseBasicParsing parameter and try again.
+::    reg query HKLM\SOFTWARE\classes\Hw...
