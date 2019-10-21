@@ -70,6 +70,7 @@ Usage examples:
   - get HKEY_USERS Reg Values
   - Experion ACL Verify
   - diskdrive status
+  - collecting branc hcache status and settings
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -77,9 +78,11 @@ Usage examples:
     - netsh int ipv4 show dynamicport tcp
     - netsh int tcp show global
     - netsh int ipv4 show offload
+    - netsh interface IP show config
     - netsh interface ipv4 show ipstats
     - netsh interface ipv4 show tcpstats
     - netsh http show urlacl
+    - netsh http show servicestate
   - nslookup - forward & revers
   - arp -a -v
   - route print
@@ -133,3 +136,4 @@ Usage examples:
   - Backbuild history assignments
   - chkem /tpspoints
   - chkem /tpsmappings
+  - reg query HKLM\SOFTWARE\classes\Hw...

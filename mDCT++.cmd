@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.26
-:: Last-Update by krasimir.kumanov@gmail.com: 05-Oct-2019
+set _ScriptVersion=v1.27
+:: Last-Update by krasimir.kumanov@gmail.com: 21-Oct-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -1122,6 +1122,15 @@ if exist "%windir%\Honeywell_MsPatches.txt" (
 	call :logitem . get Honeywell_MsPatches.txt
 	call :doCmd copy /y "%windir%\Honeywell_MsPatches.txt" "!_DirWork!\GeneralSystemInfo\_Honeywell_MsPatches.txt"
 )
+if exist "%HwInstallPath%\\Experion PKS\Install\Honeywell_MsPatches.txt" (
+	call :logitem . get Honeywell_MsPatches.txt
+	call :doCmd copy /y "%HwInstallPath%\\Experion PKS\Install\Honeywell_MsPatches.txt" "!_DirWork!\GeneralSystemInfo\_Honeywell_MsPatches.txt"
+)
+if exist "%HwInstallPath%\Experion PKS\Install\honeywell_required_patches.log" (
+	call :logitem . get honeywell_required_patches.log
+	call :doCmd copy /y "%HwInstallPath%\\Experion PKS\Install\honeywell_required_patches.log" "!_DirWork!\GeneralSystemInfo\_honeywell_required_patches.log"
+)
+
 
 call :logitem . WindowsUpdate.log
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
@@ -1188,7 +1197,8 @@ call :logOnlyItem . reg query misc
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
 call :InitLog !_RegFile!
-call :GetReg QUERY  "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
+call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management" /s
 
 call :logOnlyItem . Windows Time status/settings
 set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
@@ -1265,16 +1275,35 @@ if not "%_VEP%"=="1" (
 )
 
 
-call :logitem task list /verbose
+call :logitem . task list /verbose
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :LogCmd !_DirWork!\GeneralSystemInfo\_TaskList.csv tasklist /v /fo csv
 
-call :logitem query information about processes, sessions, and RD Session Host servers
+call :logitem . cmd query output
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY USER
 call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY SESSION
 call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY TERMSERVER
 call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY PROCESS
+
+
+:: BranchCache
+call :logitem . collecting branc hcache status and settings
+set _BranchcacheFile=!_DirWork!\GeneralSystemInfo\_BranchCache.txt
+call :InitLog !_BranchcacheFile!
+call :logCmd !_BranchcacheFile! netsh branchcache show hostedcache
+call :logCmd !_BranchcacheFile! netsh branchcache show localcache		
+call :logCmd !_BranchcacheFile! netsh branchcache show publicationcache
+call :logCmd !_BranchcacheFile! netsh branchcache show status all
+call :logCmd !_BranchcacheFile! netsh branchcache smb show latency
+if !_OSVER3! GEQ 9200 ( call :logitem .. fetching Branchcache infos using PowerShell
+						call :logCmd !_BranchcacheFile! PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -command "Get-BCStatus")
+call :logCmd !_BranchcacheFile! bitsadmin /list /AllUsers /verbose
+call :logCmd !_BranchcacheFile! bitsadmin /util /version /verbose
+call :logCmd !_BranchcacheFile! bitsadmin /PEERS /LIST
+call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistpub 
+call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistRepub 
+
 
 goto :eof
 :endregion Windows
@@ -1304,10 +1333,12 @@ call :InitLog !_NetShFile!
 call :LogCmd !_NetShFile! netsh int ipv4 show dynamicport tcp
 call :LogCmd !_NetShFile! netsh int tcp show global
 call :LogCmd !_NetShFile! netsh int ipv4 show offload
+call :LogCmd !_NetShFile! netsh interface IP show config
 call :LogCmd !_NetShFile! netsh interface ipv4 show ipstats
 call :LogCmd !_NetShFile! netsh interface ipv4 show udpstats
 call :LogCmd !_NetShFile! netsh interface ipv4 show tcpstats
 call :LogCmd !_NetShFile! netsh http show urlacl
+call :LogCmd !_NetShFile! netsh http show servicestate
 
 :nslookup
 call :logitem . nslookup
@@ -1343,6 +1374,7 @@ call :LogCmd !_DirWork!\_Network\nbtstat.txt  nbtstat -n
 call :logitem . firewall rules
 call :InitLog !_DirWork!\_Network\firewall_rules.txt
 call :LogCmd !_DirWork!\_Network\firewall_rules.txt netsh advfirewall monitor show firewall verbose
+if exist %windir%\system32\LogFiles\Firewall\pfirewall.log call :doCmd Copy /y %windir%\system32\LogFiles\Firewall\pfirewall.log !_DirWork!\_Network\_pFirewall.log
 
 call :logitem . net commands
 set _NetCmdFile=!_DirWork!\_Network\netcmd.txt
@@ -1771,4 +1803,6 @@ exit /b 1 -- no cab, end compress
 ::    fif ECHO is off. in wmic output
 ::    added -UseBasicParsing in Invoke-WebRequest
 ::    - The response content cannot be parsed because the Internet Explorer engine is not available, or Internet Explorer's first-launch configuration is not complete. Specify the UseBasicParsing parameter and try again.
+::  - v1.27 :
 ::    reg query HKLM\SOFTWARE\classes\Hw...
+::    collecting branc hcache status and settings
