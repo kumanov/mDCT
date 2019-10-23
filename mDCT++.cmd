@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.27
-:: Last-Update by krasimir.kumanov@gmail.com: 21-Oct-2019
+set _ScriptVersion=v1.28
+:: Last-Update by krasimir.kumanov@gmail.com: 23-Oct-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -1305,6 +1305,10 @@ call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkServi
 call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistRepub 
 
 
+call :logitem export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
+call :doCmd wevtutil epl Microsoft-Windows-TerminalServices-LocalSessionManager/Operational !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_TSLSMOperational.evtx /overwrite:true
+
+
 goto :eof
 :endregion Windows
 
@@ -1806,3 +1810,4 @@ exit /b 1 -- no cab, end compress
 ::  - v1.27 :
 ::    reg query HKLM\SOFTWARE\classes\Hw...
 ::    collecting branc hcache status and settings
+::  - v1.28 : export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events

@@ -71,6 +71,7 @@ Usage examples:
   - Experion ACL Verify
   - diskdrive status
   - collecting branc hcache status and settings
+  - export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
 - Network information
   - netstat -nato
   - ipconfig /displaydns
