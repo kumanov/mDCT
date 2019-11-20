@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.28
-:: Last-Update by krasimir.kumanov@gmail.com: 23-Oct-2019
+set _ScriptVersion=v1.29
+:: Last-Update by krasimir.kumanov@gmail.com: 20-Nov-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -875,7 +875,7 @@ call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
 call :doCmd copy /y "%HwProgramData%\HMIWebLog\PersistentDictionary.xml" "!_DirWork!\Station-logs\"
 
-call :logitem task list /services
+call :logitem tasklist /svc
 call :mkNewDir  !_DirWork!\ServerDataDirectory
 call :LogCmd !_DirWork!\ServerDataDirectory\TaskList.txt tasklist /svc
 
@@ -1095,6 +1095,7 @@ call :LogCmd !_DirWork!\GeneralSystemInfo\_EnvVariables.txt set
 
 call :logitem . scheduled task - query
 schtasks /query /xml ONE >!_DirWork!\GeneralSystemInfo\_scheduled_tasks.xml
+schtasks /query /fo list /v >!_DirWork!\GeneralSystemInfo\_scheduled_tasks.txt
 call :SleepX 1
 
 call :logitem . collecting GPResult output
@@ -1116,7 +1117,7 @@ call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Power"  /s /t reg_dword
 
 call :logitem . collecting Quick Fix Engineering information (Hotfixes)
-call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_Hotfixes.txt qfe list
+call :doCmd  wmic /output:"!_DirWork!\GeneralSystemInfo\_Hotfixes.txt" qfe list
 
 if exist "%windir%\Honeywell_MsPatches.txt" (
 	call :logitem . get Honeywell_MsPatches.txt
@@ -1143,7 +1144,7 @@ if exist %windir%\Logs\WindowsUpdate (
 
 :WmiRootSecurityDescriptor
 call :logitem . WMI Root Security Descriptor
-call :doCmd  wmic /output:!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt /namespace:\\root path __systemsecurity call GetSecurityDescriptor
+call :doCmd  wmic /output:"!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt" /namespace:\\root path __systemsecurity call GetSecurityDescriptor
 
 :: McAfee on accesss scanner settings
 reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
@@ -1199,6 +1200,7 @@ set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management" /s
+call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /s
 
 call :logOnlyItem . Windows Time status/settings
 set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
@@ -1275,9 +1277,9 @@ if not "%_VEP%"=="1" (
 )
 
 
-call :logitem . task list /verbose
+call :logitem . tasklist /verbose
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
-call :LogCmd !_DirWork!\GeneralSystemInfo\_TaskList.csv tasklist /v /fo csv
+tasklist /v /fo csv >!_DirWork!\GeneralSystemInfo\_TaskList.csv
 
 call :logitem . cmd query output
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
@@ -1502,12 +1504,12 @@ call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\CrashControl" /s
 call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug" /s
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AeDebug" /s
-call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows\Windows Error Reporting\LocalDumps" /s
-call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows\Windows Error Reporting" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /s
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options" /s
 
 call :logitem . Recover OS settings
-call :DoCmd  wmic /output:!_DirWork!\CrashDumps\_recoveros.txt RECOVEROS
+call :DoCmd  wmic /output:"!_DirWork!\CrashDumps\_recoveros.txt" RECOVEROS
 )
 
 where dual_status >NUL 2>&1
@@ -1811,3 +1813,4 @@ exit /b 1 -- no cab, end compress
 ::    reg query HKLM\SOFTWARE\classes\Hw...
 ::    collecting branc hcache status and settings
 ::  - v1.28 : export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
+::  - v1.29 fix 'wmic /output:"path"' command

@@ -114,10 +114,10 @@ Usage examples:
   - crash dump files list
   - Recover OS settings
   - registry Crash Control settings
-= SQL queries
+- SQL queries
   - EMSEvents queries
   - SQLDBLogs status
-  = SQL Loggins
+  - SQL Loggins
   - NON_ERDB_POINTS_PARAMS
 - Experion
   - dsasublist output
