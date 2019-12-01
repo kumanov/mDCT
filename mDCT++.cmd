@@ -11,7 +11,7 @@ setlocal enableDelayedExpansion
 ::  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ::  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-if defined _DbgOut ( echo. %time% : Start of mDCT++)
+@if defined _DbgOut ( echo. %time% : Start of mDCT++)
 :: handle /?
 if "%~1"=="/?" (
 	call :usage
@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.29
-:: Last-Update by krasimir.kumanov@gmail.com: 20-Nov-2019
+set _ScriptVersion=v1.30
+:: Last-Update by krasimir.kumanov@gmail.com: 01-Dec-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -80,7 +80,7 @@ chcp 437 >NUL
 SET _title=%~nx0 - version %_ScriptVersion%
 TITLE %_title% & set _title=
 
-if defined _DbgOut ( echo. %time% _DirScript: %_DirScript% )
+@if defined _DbgOut ( echo. %time% _DirScript: %_DirScript% )
 
 :: Change Directory to the location of the batch script file (%0)
 CD /d "%_DirScript%"
@@ -148,17 +148,17 @@ set _ProcArch=%PROCESSOR_ARCHITECTURE%
 if "!_ProcArch!" equ "AMD64" Set _ProcArch=x64
 
 set _Comp_Time=%COMPUTERNAME%_%_CurDateTime%
-if defined _DbgOut ( echo. %time% _Comp_Time: %_Comp_Time% )
+@if defined _DbgOut ( echo. %time% _Comp_Time: %_Comp_Time% )
 :: set work folder
 set _DirWork=%_DirScript%%_Comp_Time%
 
-if defined _DbgOut ( echo. %time% _DirWork: !_DirWork! )
+@if defined _DbgOut ( echo. %time% _DirWork: !_DirWork! )
 
 :: init working dir
 call :mkNewDir !_DirWork!
 :: init LogFile
 if not defined _LogFile set _LogFile=!_DirWork!\mDCTlog.txt
-if defined _DbgOut ( echo. %time% _LogFile: !_LogFile! )
+@if defined _DbgOut ( echo. %time% _LogFile: !_LogFile! )
 call :InitLog !_LogFile!
 
 :: change priority to idle - this & all child commands
@@ -174,7 +174,7 @@ if "%errorlevel%"=="0" (set _VEP=1)
 if defined _GetLocale ( call :getLocale _locale )
 
 call :logOnlyItem  mDCT++ (krasimir.kumanov@gmail.com) -%_ScriptVersion% start invocation: '%_DirScript%%~n0 %*'
-call :logNoTimeItem  Windows version:  !v! Minor: !_OSVER4!
+call :logNoTimeItem  Windows version:  !_v! Minor: !_OSVER4!
 call :showlogitem   ScriptVersion: %~n0 %_ScriptVersion% - DateTime: !_CurDateTime! Locale: !_locale! PSversion: %_PSVer%
 
 goto :eof
@@ -227,9 +227,6 @@ goto :eof
 	)
 
 :getWinVer - UTILITY to get Windows Version
-	:: #########################
-	:: OS-specific checks...
-	:: #########################
 	for /f "tokens=2 delims=[]" %%o in ('ver')    do @set _OSVERTEMP=%%o
 	for /f "tokens=2" %%o in ('echo %_OSVERTEMP%') do @set _OSVER=%%o
 	for /f "tokens=1 delims=." %%o in ('echo %_OSVER%') do @set _OSVER1=%%o
@@ -237,7 +234,7 @@ goto :eof
 	for /f "tokens=3 delims=." %%o in ('echo %_OSVER%') do @set _OSVER3=%%o
 	for /f "tokens=4 delims=." %%o in ('echo %_OSVER%') do @set _OSVER4=%%o
 	for /f "tokens=4-8 delims=[.] " %%i in ('ver') do (if %%i==Version (set _v=%%j.%%k.%%l.%%m) else (set _v=%%i.%%j.%%k.%%l))
-	if defined _DbgOut ( echo. %time% ###getWinVer OS: %_OSVER1% %_OSVER2% %_OSVER3% %_OSVER4% Version %_v% )
+	@if defined _DbgOut ( echo. %time% ###getWinVer OS: %_OSVER1% %_OSVER2% %_OSVER3% %_OSVER4% Version %_v% )
 	:: echo Windows Version: %_v%
 	:: 10.0 - Windows 10		10240 RTM, 10586 TH2 v1511, 14393 RS1 v1607, 15063 RS2 v1703, 16299 RS3 1709, 17134 RS4 1803, 17692 RS5 1809
 	::  6.3 - Windows 8.1 and Windows Server 2012R2 9600
@@ -544,7 +541,7 @@ call :InitLog !_outFile!
 >>!_psFile! echo $('{0} processes; {1}/{2} with/without GDI objects' -f $allProcesses.Count, $GuiResources.Count, ($allProcesses.Count - $GuiResources.Count)) ^| out-file !_outFile! -Append -Encoding ascii
 >>!_psFile! echo "Total number of GDI handles: $auxCountHandles" ^| out-file !_outFile! -Append -Encoding ascii
 PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass %_psFile%
-if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at getGDIHandlesCount with PowerShell'. )
+@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at getGDIHandlesCount with PowerShell'. )
 if "%errorlevel%" neq "0" (
 	call :logItem %time% .. ERROR: %errorlevel% - 'getGDIHandlesCount with PowerShell' failed.
 	)
@@ -567,7 +564,7 @@ if defined %2 set _outFile=!%~2!
 >>!_outFile! echo get '!_groupName!' members
 >>!_outFile! echo ========================================
 PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { @(try{@(([ADSI]'WinNT://./!_groupName!').Invoke('Members'))}catch{}) | foreach{$_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null)} | Out-File '!_outFile!' -Append -Encoding ascii }}"
-if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - at get '!_groupName!' members with PowerShell. )
+@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - at get '!_groupName!' members with PowerShell. )
 if "%errorlevel%" neq "0" (
 	call :logItem %time% .. ERROR: %errorlevel% - get '!_groupName!' members with PowerShell failed.
 	)
@@ -785,6 +782,27 @@ IF %tze% LSS 10 (set tz=0%tze%)
 )
 exit /b
 
+:export-evtx  -- function to export Windows Events in evtx file
+	::            -- %~1 [in]: Log Name
+	::            -- %~2 [in,opt]: output folder or file
+	SETLOCAL
+	set "_Channel=%~1"
+	set "_folder=%~2"
+	if /i "%_folder:~-1%"=="\" (
+		call :mkNewDir %_folder%
+		set "_evtxFile=!_Channel:/=-!.evtx"
+		if /i "!_evtxFile:~0,18!" equ "Microsoft-Windows-" (set "_evtxFile=!_evtxFile:~18!")
+		set "_evtxFile=!_folder!!_evtxFile!"
+	) else (
+		set "_evtxFile=!_folder!"
+	)
+	:: set events limit
+	for /f "usebackq delims=" %%h in (`PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { (Get-Date).AddDays(-60).toString('s')+'Z' }}"`) do set "_TimeLimit=%%h"
+	:: export events
+	wevtutil epl "%_Channel%" "%_evtxFile%" "/q:*[System[TimeCreated[@SystemTime>='!_TimeLimit!']]]" /overwrite:true
+	ENDLOCAL
+	@goto :eof
+
 :myFunctionName    -- function description here
 ::                 -- %~1 [in,out,opt]: argument description here
 SETLOCAL
@@ -844,12 +862,12 @@ call :InitLog !_DirWork!\GeneralSystemInfo\timezone.output.txt
 call :SleepX 1
 
 (call :logitem export Windows Events
-call :doCmd wevtutil epl Application !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Application.evtx /overwrite:true
-call :doCmd wevtutil epl FTE !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_FTE.evtx /overwrite:true
-call :doCmd wevtutil epl HwSnmp !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_HwSnmp.evtx /overwrite:true
-call :doCmd wevtutil epl HwSysEvt !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_HwSysEvt.evtx /overwrite:true
-call :doCmd wevtutil epl Security !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Security.evtx /overwrite:true
-call :doCmd wevtutil epl System !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.evtx /overwrite:true)
+call :export-evtx Application !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Application.evtx
+call :export-evtx FTE         !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_FTE.evtx
+call :export-evtx HwSnmp      !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_HwSnmp.evtx
+call :export-evtx HwSysEvt    !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_HwSysEvt.evtx
+call :export-evtx Security    !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Security.evtx
+call :export-evtx System      !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.evtx)
 
 call :logitem get Experion PKS Product Version file
 call :doCmd copy /y "%HwInstallPath%\Experion PKS\ProductVersion.txt" "!_DirWork!\GeneralSystemInfo\"
@@ -895,7 +913,7 @@ if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 	if exist "%HwProgramData%\Experion PKS\logfiles\00-Server\" (
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
 		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\logfiles\00-Server\' -filt logServerY*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep 1} }}
-		if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
 )
@@ -1053,9 +1071,15 @@ if %errorlevel%==0 (
 	call :logitem Notification Utility - Dump indexes
 	call :mkNewDir !_DirWork!\ServerDataDirectory
 	call :InitLog !_DirWork!\ServerDataDirectory\notifindexes.output.txt
-    call :logCmd !_DirWork!\ServerDataDirectory\notifindexes.output.txt notifdmp --dump-indexes
+    call :logCmd  !_DirWork!\ServerDataDirectory\notifindexes.output.txt notifdmp --dump-indexes
 )
 
+:: ErrorHandling
+call :logitem get ErrorHandling log files
+call :mkNewDir !_DirWork!\ErrorHandling
+call :doCmd copy /y "%HwProgramData%\Experion PKS\BrowserLog_Current.txt" "!_DirWork!\ErrorHandling\"
+call :doCmd copy /y "%HwProgramData%\Experion PKS\CurrentLogIndex.txt" "!_DirWork!\ErrorHandling\"
+call :doCmd copy /y "%HwProgramData%\Experion PKS\ErrLog_*.txt" "!_DirWork!\ErrorHandling\"
 
 goto :eof
 :endregion
@@ -1117,7 +1141,7 @@ call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Power"  /s /t reg_dword
 
 call :logitem . collecting Quick Fix Engineering information (Hotfixes)
-call :doCmd  wmic /output:"!_DirWork!\GeneralSystemInfo\_Hotfixes.txt" qfe list
+call :doCmd  wmic /output:"!_DirWork!\GeneralSystemInfo\_Hotfixes.txt" qfe list full /format:table
 
 if exist "%windir%\Honeywell_MsPatches.txt" (
 	call :logitem . get Honeywell_MsPatches.txt
@@ -1136,11 +1160,12 @@ if exist "%HwInstallPath%\Experion PKS\Install\honeywell_required_patches.log" (
 call :logitem . WindowsUpdate.log
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :doCmd copy /y "%windir%\WindowsUpdate.log" "!_DirWork!\GeneralSystemInfo\_WindowsUpdate.log"
-if exist %windir%\Logs\WindowsUpdate (
-	call :logitem . get Windows Update ETL Logs
-	call :mkNewDir  !_DirWork!\GeneralSystemInfo\_WindowsUpdateEtlLogs
-	call :doCmd copy /y "%windir%\Logs\WindowsUpdate\*.etl" "!_DirWork!\GeneralSystemInfo\_WindowsUpdateEtlLogs\"
-)
+:: ETL logs collection skiped for now
+::if exist %windir%\Logs\WindowsUpdate (
+::	call :logitem . get Windows Update ETL Logs
+::	call :mkNewDir  !_DirWork!\GeneralSystemInfo\_WindowsUpdateEtlLogs
+::	call :doCmd copy /y "%windir%\Logs\WindowsUpdate\*.etl" "!_DirWork!\GeneralSystemInfo\_WindowsUpdateEtlLogs\"
+::)
 
 :WmiRootSecurityDescriptor
 call :logitem . WMI Root Security Descriptor
@@ -1214,7 +1239,7 @@ call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s
 (:: temperature
 if not "%_VEP%"=="1" (
 	call :mkNewDir  !_DirWork!\GeneralSystemInfo
-	set _ThermalZoneTemperature=!_DirWork!\GeneralSystemInfo\_ThermalZoneTemperature.txt
+	set _ThermalZoneTemperature="!_DirWork!\GeneralSystemInfo\_ThermalZoneTemperature.txt"
 	call :InitLog !_ThermalZoneTemperature!
 	@echo Temperature at thermal zone in tenths of degrees Kelvin >>!_ThermalZoneTemperature!
 	@echo Convert to Celsius: xxx / 10 - 273.15 >>!_ThermalZoneTemperature!
@@ -1246,7 +1271,6 @@ set _RegFile=!_DirWork!\RegistryInfo\_HKEY_USERS.txt
 call :mkNewDir !_DirWork!\RegistryInfo
 if exist !_RegFile! call :doit del "!_RegFile!"
 call :GetHkeyUsersRegValues
-
 
 :: get mngr account information - Local Group Memberships
 call :logitem . get mngr account information - Local Group Memberships
@@ -1298,7 +1322,7 @@ call :logCmd !_BranchcacheFile! netsh branchcache show localcache
 call :logCmd !_BranchcacheFile! netsh branchcache show publicationcache
 call :logCmd !_BranchcacheFile! netsh branchcache show status all
 call :logCmd !_BranchcacheFile! netsh branchcache smb show latency
-if !_OSVER3! GEQ 9200 ( call :logitem .. fetching Branchcache infos using PowerShell
+if !_OSVER3! GEQ 9200 ( call :logitem . fetching Branchcache infos using PowerShell
 						call :logCmd !_BranchcacheFile! PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -command "Get-BCStatus")
 call :logCmd !_BranchcacheFile! bitsadmin /list /AllUsers /verbose
 call :logCmd !_BranchcacheFile! bitsadmin /util /version /verbose
@@ -1307,8 +1331,16 @@ call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkServi
 call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistRepub 
 
 
-call :logitem export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
-call :doCmd wevtutil epl Microsoft-Windows-TerminalServices-LocalSessionManager/Operational !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_TSLSMOperational.evtx /overwrite:true
+call :logitem . export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
+call :export-evtx Microsoft-Windows-TerminalServices-LocalSessionManager/Operational !_DirWork!\GeneralSystemInfo\
+
+:: MSPower_DeviceEnable
+call :logItem . MSPower_DeviceEnable query
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+set _MSPower_DeviceEnable="!_DirWork!\GeneralSystemInfo\_MSPower_DeviceEnable.txt"
+call :InitLog !_MSPower_DeviceEnable!
+@echo.>>!_MSPower_DeviceEnable!
+call :LogWmicCmd !_MSPower_DeviceEnable! wmic /namespace:\\root\wmi PATH MSPower_DeviceEnable get Active,Enable,InstanceName
 
 
 goto :eof
@@ -1445,6 +1477,11 @@ call :logitem . get clientaccesspolicy.xml for Silverlight
 PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml -UseBasicParsing).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
 call :SleepX 1
 
+call :logitem . get FTE config files
+call :mkNewDir  "!_DirWork!\FTELogs"
+call :doCmd copy /y "%HwProgramData%\ProductConfig\FTE\FTEinstall.inf" "!_DirWork!\FTELogs\_FTEinstall.inf"
+call :doCmd copy /y "%HwProgramData%\ProductConfig\FTE\fteconfig.inf" "!_DirWork!\FTELogs\_fteConfig.inf"
+
 goto :eof
 :endregion NetworkAddData
 
@@ -1497,6 +1534,10 @@ call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\CrashDum
 call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
 call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
 call :logCmd  !_CrashDumpsList! dir  /o-d /s c:\users\*.dmp
+call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\System32\config\systemprofile\AppData\Local\CrashDumps\*.dmp
+call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\SysWOW64\config\systemprofile\AppData\Local\CrashDumps\*.dmp
+call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\ServiceProfiles\*.dmp
+call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\LiveKernelReports\*.dmp
 
 call :logitem . crash control registry settings
 set _RegFile=!_DirWork!\CrashDumps\_RegCrashControl.txt
@@ -1595,6 +1636,23 @@ if defined _isServer (
 	call :GetReg QUERY "HKLM\SOFTWARE\classes\HwHsc.OPCServer5" /s
 )
 
+:: check files in Abstract folder for Zone.Identifier stream data
+call :logItem . check files in Abstract folder for Zone.Identifier stream data
+call :mkNewDir  !_DirWork!\Station-logs
+:dir/s/r "%HwProgramData%\Experion PKS\Client\Abstract"|find/i "Zone.Identifier:$DATA" >%temp%\_Zone.Identifier.txt
+if %errorlevel%==0 (
+	call :doCmd move /y %temp%\_Zone.Identifier.txt "!_DirWork!\Station-logs\"
+) else (
+	call :doit del %temp%\_Zone.Identifier.txt
+)
+
+:: get system station configuration files
+call :logItem . get system station configuration files  (Factory.stn, etc.)
+call :mkNewDir  !_DirWork!\Station-logs
+call :doCmd copy /y "%HwInstallPath%\Experion PKS\Client\Station\Default.stn" "!_DirWork!\Station-logs\@Default.stn"
+call :doCmd copy /y "%HwInstallPath%\Experion PKS\Client\Station\Factory.stn" "!_DirWork!\Station-logs\@Factory.stn"
+call :doCmd copy /y "%HwInstallPath%\Experion PKS\Client\Station\PanelStation_Default.stn" "!_DirWork!\Station-logs\@PanelStation_Default.stn"
+
 
 goto :eof
 :endregion ExperionAddData
@@ -1686,7 +1744,7 @@ goto :eof
 	)
 	call :mkNewDir !_DirWork!\Perfmon Logs
 	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci $env:HWPERFLOGPATH -filt *.blg | where{$_.LastWriteTime -gt (get-date).AddDays(-10)} | foreach{copy $_.fullName -dest '!_DirWork!\Perfmon Logs\'; sleep 1} }}
-	if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy blg files with PowerShell'. )
+	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy blg files with PowerShell'. )
 	if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy blg files with PowerShell' failed.)
 	goto :eof
 )
@@ -1727,7 +1785,7 @@ if !_PSVer! LEQ 2 (
 	:: next line only works for PS version greater v2
 	call :logitem .. PowerShell: compressing data %_DirWork% - please be patient...
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { try { $ErrorActionPreference = 'continue'; Add-Type -Assembly 'System.IO.Compression.FileSystem'; [System.IO.Compression.ZipFile]::CreateFromDirectory('%_DirWork%', '%_DirWork%\..\!cabName!'); Exit 0 } catch { Write-host -ForegroundColor red 'Compress Failed'; Throw $error[0].Exception.Message; Exit 23 } }}"
-		if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Compress with PowerShell'. )
+		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Compress with PowerShell'. )
 		if "%errorlevel%" neq "0" (
 			call :logItem %time% .. ERROR: %errorlevel% - 'Compress with PowerShell' failed.
 			set _DoCleanup=0
@@ -1814,3 +1872,13 @@ exit /b 1 -- no cab, end compress
 ::    collecting branc hcache status and settings
 ::  - v1.28 : export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
 ::  - v1.29 fix 'wmic /output:"path"' command
+::  - v1.30
+::    extended search for crash files
+::    fix Windows version output in log file
+::    get FTE config files - FTEinstall.inf & fteconfig.inf
+::    get Display Links file - [TouchPanel] section in stn file
+::    wmic query MSPower_DeviceEnable
+::    get ErrorHandling log files 
+::    check files in Abstract folder for Zone.Identifier stream data
+::    function :export-evtx
+::    get system station configuration files

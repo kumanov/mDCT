@@ -45,7 +45,7 @@ Usage examples:
     - powercfg /query
     - "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
   - WindowsUpdate.log
-    - collect %windir%\Logs\WindowsUpdate\*.etl
+    - (skipped for now) collect %windir%\Logs\WindowsUpdate\*.etl
   - SystemInfo.exe output
   - WMI root:/ security descriptor
   - Scheduled tasks query output
@@ -72,6 +72,7 @@ Usage examples:
   - diskdrive status
   - collecting branc hcache status and settings
   - export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
+  - wmic query MSPower_DeviceEnable
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -110,6 +111,7 @@ Usage examples:
     - stat raw text
   - get NetTcpPortSharing config file
   - get clientaccesspolicy.xml for Silverlight
+  - get FTE config files - FTEinstall.inf & fteconfig.inf
 - Crash Dumps
   - crash dump files list
   - Recover OS settings
@@ -138,3 +140,5 @@ Usage examples:
   - chkem /tpspoints
   - chkem /tpsmappings
   - reg query HKLM\SOFTWARE\classes\Hw...
+  - check files in Abstract folder for Zone.Identifier stream data
+  - get system station configuration files (Factory.stn, etc.)
