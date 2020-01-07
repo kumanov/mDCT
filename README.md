@@ -73,6 +73,7 @@ Usage examples:
   - collecting branc hcache status and settings
   - export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
   - wmic query MSPower_DeviceEnable
+  - pending reboot check
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -121,6 +122,7 @@ Usage examples:
   - SQLDBLogs status
   - SQL Loggins
   - NON_ERDB_POINTS_PARAMS
+  - SQL Config & Memory Status
 - Experion
   - dsasublist output
   - filfrag output
@@ -130,15 +132,16 @@ Usage examples:
   - cstn_status
   - ps output
   - shheap 1 check output
+  - shheap 2 dump (dual_q heap)
   - list disk resident heap files
   - copy station.ini file
   - collect station configuration files
     - station configuration files (*.stn)
     - station toolbar files (*.stb)
     - Display Links files
+  - get system station configuration files (Factory.stn, etc.)
   - Backbuild history assignments
   - chkem /tpspoints
   - chkem /tpsmappings
   - reg query HKLM\SOFTWARE\classes\Hw...
   - check files in Abstract folder for Zone.Identifier stream data
-  - get system station configuration files (Factory.stn, etc.)

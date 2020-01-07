@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.30
-:: Last-Update by krasimir.kumanov@gmail.com: 01-Dec-2019
+set _ScriptVersion=v1.31
+:: Last-Update by krasimir.kumanov@gmail.com: 02-Dec-2019
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -144,8 +144,11 @@ if /i "%_Usage%" EQU "1" ( call :usage
 call :getWinVer
 call :getDateTime
 for /f "delims=" %%a in ('PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { $PSVersionTable.PSVersion.Major }}"') do set _PSVer=%%a
-set _ProcArch=%PROCESSOR_ARCHITECTURE%
-if "!_ProcArch!" equ "AMD64" Set _ProcArch=x64
+:: Win OS 32/64 bit version
+Set _xOS=64
+if "%PROCESSOR_ARCHITECTURE%" equ "x86" (
+	if not defined PROCESSOR_ARCHITECTURE6432 ( set _xOS=32 )
+)
 
 set _Comp_Time=%COMPUTERNAME%_%_CurDateTime%
 @if defined _DbgOut ( echo. %time% _Comp_Time: %_Comp_Time% )
@@ -801,6 +804,7 @@ exit /b
 	:: export events
 	wevtutil epl "%_Channel%" "%_evtxFile%" "/q:*[System[TimeCreated[@SystemTime>='!_TimeLimit!']]]" /overwrite:true
 	ENDLOCAL
+	call :SleepX 1
 	@goto :eof
 
 :myFunctionName    -- function description here
@@ -1174,13 +1178,17 @@ call :doCmd  wmic /output:"!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescript
 :: McAfee on accesss scanner settings
 reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
+	call :logitem . McAfee On Access Scanner - reg settings
 	::call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
+	call :mkNewDir  !_DirWork!\RegistryInfo
 	call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
 )
 
 :: Symantec\Symantec Endpoint Protection\AV
 reg query "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
+	call :logitem . Symantec Endpoint Protection / AV - reg settings
+	call :mkNewDir  !_DirWork!\RegistryInfo
 	set _RegFile=!_DirWork!\RegistryInfo\_Symantec_SEP_AV.txt
 	call :InitLog !_RegFile!
 	call :GetReg QUERY "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" /s
@@ -1194,11 +1202,6 @@ call :SleepX 1
 
 call :logitem . query drivers information
 call :LogCmd !_DirWork!\GeneralSystemInfo\_driverquery.output.csv driverquery /fo csv /v
-
-call :logOnlyItem . reg query Policies Windows Defender
-set _RegFile=!_DirWork!\GeneralSystemInfo\_PoliciesWindowsDefender.txt
-call :InitLog !_RegFile!
-call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
 
 call :logOnlyItem . reg query RPC settings
 call :mkNewDir  !_DirWork!\RegistryInfo
@@ -1224,6 +1227,7 @@ call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
+call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management" /s
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /s
 
@@ -1313,7 +1317,7 @@ call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY TERMSERVER
 call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY PROCESS
 
 
-:: BranchCache
+(:: BranchCache
 call :logitem . collecting branc hcache status and settings
 set _BranchcacheFile=!_DirWork!\GeneralSystemInfo\_BranchCache.txt
 call :InitLog !_BranchcacheFile!
@@ -1329,6 +1333,7 @@ call :logCmd !_BranchcacheFile! bitsadmin /util /version /verbose
 call :logCmd !_BranchcacheFile! bitsadmin /PEERS /LIST
 call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistpub 
 call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistRepub 
+)
 
 
 call :logitem . export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
@@ -1342,6 +1347,31 @@ call :InitLog !_MSPower_DeviceEnable!
 @echo.>>!_MSPower_DeviceEnable!
 call :LogWmicCmd !_MSPower_DeviceEnable! wmic /namespace:\\root\wmi PATH MSPower_DeviceEnable get Active,Enable,InstanceName
 
+
+(:: PendingRebot
+call :logitem . check pending reboot
+set _outFile=!_DirWork!\GeneralSystemInfo\_PendingRebot.txt
+set _RegFile=!_outFile!
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :InitLog !_outFile!
+call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing" /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update" /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager" /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\ComputerName" /s
+
+@echo ================================================================================== >> "!_outFile!"
+@echo ===== %time% :PS: Invoke-WmiMethod -Namespace root\ccm\clientsdk -Class CCM_ClientUtilities -Name DetermineIfRebootPending>> "!_outFile!"
+@echo ================================================================================== >> "!_outFile!"
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{Invoke-WmiMethod -Namespace root\ccm\clientsdk -Class CCM_ClientUtilities -Name DetermineIfRebootPending -ea stop | select IsHardRebootPending,RebootPending,ReturnValue} catch{$_.Exception.Message} ) | out-file '!_outFile!' -Append -Encoding ascii}"
+
+@echo.
+@echo ================================================================================== >> "!_outFile!"
+@echo ===== %time% : WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call DetermineIfRebootPending>> "!_outFile!"
+@echo ================================================================================== >> "!_outFile!"
+WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call DetermineIfRebootPending 2>>&1| more /s | find /v "" >>!_outFile! 2>>&1
+)
+
+:: next
 
 goto :eof
 :endregion Windows
@@ -1474,8 +1504,11 @@ for /f "usebackq skip=1" %%h in (`wmic service where "name='NetTcpPortSharing'" 
 	)
 
 call :logitem . get clientaccesspolicy.xml for Silverlight
-PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml -UseBasicParsing).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
+call :mkNewDir  "!_DirWork!\_Network"
+::PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml -UseBasicParsing).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(New-Object System.Net.WebClient).DownloadString('http://localhost/clientaccesspolicy.xml')} catch{$_.Exception.Message} ) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
 call :SleepX 1
+
 
 call :logitem . get FTE config files
 call :mkNewDir  "!_DirWork!\FTELogs"
@@ -1528,16 +1561,18 @@ call :logitem . create crash dumps list
 call :mkNewDir !_DirWork!\CrashDumps
 set _CrashDumpsList=!_DirWork!\CrashDumps\_CrashDumpsList.txt
 call :InitLog !_CrashDumpsList!
-call :logCmd  !_CrashDumpsList! dir %windir%\memory.dmp
-call :logCmd  !_CrashDumpsList! dir /o:-d %windir%\Minidump\
-call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
-call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
-call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
-call :logCmd  !_CrashDumpsList! dir  /o-d /s c:\users\*.dmp
-call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\System32\config\systemprofile\AppData\Local\CrashDumps\*.dmp
-call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\SysWOW64\config\systemprofile\AppData\Local\CrashDumps\*.dmp
-call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\ServiceProfiles\*.dmp
-call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\LiveKernelReports\*.dmp
+::call :logCmd  !_CrashDumpsList! dir %windir%\memory.dmp
+::call :logCmd  !_CrashDumpsList! dir /o:-d %windir%\Minidump\
+::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
+::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
+::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s c:\users\*.dmp
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\System32\config\systemprofile\AppData\Local\CrashDumps\*.dmp
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\SysWOW64\config\systemprofile\AppData\Local\CrashDumps\*.dmp
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\ServiceProfiles\*.dmp
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\LiveKernelReports\*.dmp
+START "Crash dump files list" /MIN CMD /C "dir /o-d /s %SystemDrive%\*.dmp >> !_CrashDumpsList!" 2>&1
+call :SleepX 1
 
 call :logitem . crash control registry settings
 set _RegFile=!_DirWork!\CrashDumps\_RegCrashControl.txt
@@ -1583,6 +1618,10 @@ if %errorlevel%==0 (
 	call :mkNewDir !_DirWork!\ServerDataDirectory
     call :InitLog !_DirWork!\ServerDataDirectory\_shheap.1.check.output.txt
     call :logCmd !_DirWork!\ServerDataDirectory\_shheap.1.check.output.txt shheap 1 check
+
+	call :logitem . Experion shheap 2 dump (dual_q heap)
+    call :InitLog !_DirWork!\ServerDataDirectory\_shheap.2.dump.output.txt
+    call :logCmd  !_DirWork!\ServerDataDirectory\_shheap.2.dump.output.txt shheap 2 dump
 )
 
 (call :logitem . list disk resident heap files
@@ -1639,12 +1678,14 @@ if defined _isServer (
 :: check files in Abstract folder for Zone.Identifier stream data
 call :logItem . check files in Abstract folder for Zone.Identifier stream data
 call :mkNewDir  !_DirWork!\Station-logs
-:dir/s/r "%HwProgramData%\Experion PKS\Client\Abstract"|find/i "Zone.Identifier:$DATA" >%temp%\_Zone.Identifier.txt
+call :logCmd %temp%\_Zone.Identifier.txt dir/s/r "%HwProgramData%\Experion PKS\Client\Abstract"
+find/i "Zone.Identifier:$DATA" %temp%\_Zone.Identifier.txt >NUL 2>&1
 if %errorlevel%==0 (
 	call :doCmd move /y %temp%\_Zone.Identifier.txt "!_DirWork!\Station-logs\"
 ) else (
 	call :doit del %temp%\_Zone.Identifier.txt
 )
+
 
 :: get system station configuration files
 call :logItem . get system station configuration files  (Factory.stn, etc.)
@@ -1724,9 +1765,19 @@ if %errorlevel% NEQ 0 (
 	call :logitem . Check SQL DB Logs
 	set _SqlFile=!_DirWork!\MSSQL-Logs\_CheckSQLDBLogs.txt
 	call :InitLog !_SqlFile!
-	call :DoSqlCmd master "select [name] AS 'Database Name', DATABASEPROPERTYEX([name],'recovery') AS 'Recovery Model' from master.dbo.SysDatabases"
+	call :DoSqlCmd master "select [name] AS 'DBName', CAST(DATABASEPROPERTYEX([name],'recovery') as varchar(25)) AS 'Recovery Model' from master.dbo.SysDatabases"
 	call :DoSqlCmd master "DBCC SQLPERF(LOGSPACE)"
-	call :DoSqlCmd master "select name AS 'Database name',log_reuse_wait_desc AS 'Log  Reuse' from sys.databases"
+	call :DoSqlCmd master "select CAST([name] as varchar(40)) AS 'DBName',log_reuse_wait_desc AS 'LogReuse' from sys.databases"
+
+:: SQL Config & Status
+	call :mkNewDir !_DirWork!\MSSQL-Logs
+	call :logitem . SQL Server Status
+	set _SqlFile=!_DirWork!\MSSQL-Logs\_SqlStatus.txt
+	call :InitLog !_SqlFile!
+	::call :DoSqlCmd master "SELECT * FROM sys.configurations"
+	call :DoSqlCmd master "EXEC sp_configure"
+	call :DoSqlCmd master "select * from sys.dm_os_process_memory"
+	call :DoSqlCmd master "select * FROM sys.dm_os_sys_memory"
 
 goto :eof
 :endregion
@@ -1882,3 +1933,14 @@ exit /b 1 -- no cab, end compress
 ::    check files in Abstract folder for Zone.Identifier stream data
 ::    function :export-evtx
 ::    get system station configuration files
+::  - v1.31
+::    SQL Config & Memory Status
+::    sleep delay in export-evtx
+::    SQL queries use CAST(field as varchar(25)) to reduce column width
+::    shheap 2 dump (dual_q heap)
+::    AV reg settings export - MkNewDir
+::    move Defender policies query in reg misc file
+::    use System.Net.WebClient instead of Invoke-WebRequest (not available on PS2.0)
+::    check pending reboot
+::    fix Zone.Identifier search
+::    search %SystemDrive% for crash dump files
