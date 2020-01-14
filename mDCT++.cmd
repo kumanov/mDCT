@@ -70,8 +70,8 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.31
-:: Last-Update by krasimir.kumanov@gmail.com: 02-Dec-2019
+set _ScriptVersion=v1.32
+:: Last-Update by krasimir.kumanov@gmail.com: 07-Jan-2020
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -894,7 +894,16 @@ for /r "%HwProgramData%\ProductConfig\FTE" %%g in (*.log) do (type %%g >"!_DirWo
 
 call :logitem get HMIWeb log files
 call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station-logs\"
-call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
+if NOT "_isServer"=="1" (
+	::old cmd:: call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
+	if exist "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" (
+		call :logOnlyItem get HMIWeb backup log files
+		call :mkNewDir !_DirWork!\Station-logs\Rollover-logs
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\HMIWebLog\Archived Logfiles\' -filt *.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\Station-logs\Rollover-logs'; sleep -Milliseconds 500} }}
+		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy station log archived files with PowerShell'. )
+		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy station log archived files with PowerShell' failed.)
+	)
+)
 call :doCmd copy /y "%HwProgramData%\HMIWebLog\PersistentDictionary.xml" "!_DirWork!\Station-logs\"
 
 call :logitem tasklist /svc
@@ -915,8 +924,17 @@ if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\logfiles\log*.txt" "!_DirWork!\SloggerLogs\"
 	:: copy server log archives
 	if exist "%HwProgramData%\Experion PKS\logfiles\00-Server\" (
+		call :logOnlyitem get Experion Server backup log files
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
-		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\logfiles\00-Server\' -filt logServerY*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep 1} }}
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\logfiles\00-Server\' -filt logServerY*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
+		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
+	)
+	:: copy SR log archives
+	if exist "%HwProgramData%\Experion PKS\logfiles\11-SysRep\" (
+		call :logOnlyitem get SR backup log files
+		call :mkNewDir !_DirWork!\SloggerLogs\Archives
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\logfiles\11-SysRep\' -filt logSRY*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
 		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
@@ -1155,16 +1173,23 @@ if exist "%HwInstallPath%\\Experion PKS\Install\Honeywell_MsPatches.txt" (
 	call :logitem . get Honeywell_MsPatches.txt
 	call :doCmd copy /y "%HwInstallPath%\\Experion PKS\Install\Honeywell_MsPatches.txt" "!_DirWork!\GeneralSystemInfo\_Honeywell_MsPatches.txt"
 )
+if exist "%windir%\honeywell_installed_updates.txt" (
+	call :logitem . get Honeywell_MsPatches.txt
+	call :doCmd copy /y "%windir%\honeywell_installed_updates.txt" "!_DirWork!\GeneralSystemInfo\_honeywell_installed_updates.txt"
+)
+if exist "%windir%\honeywell_required_patches.txt" (
+	call :logitem . get Honeywell_MsPatches.txt
+	call :doCmd copy /y "%windir%\honeywell_required_patches.txt" "!_DirWork!\GeneralSystemInfo\_honeywell_required_patches.txt"
+)
 if exist "%HwInstallPath%\Experion PKS\Install\honeywell_required_patches.log" (
 	call :logitem . get honeywell_required_patches.log
 	call :doCmd copy /y "%HwInstallPath%\\Experion PKS\Install\honeywell_required_patches.log" "!_DirWork!\GeneralSystemInfo\_honeywell_required_patches.log"
 )
 
-
 call :logitem . WindowsUpdate.log
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :doCmd copy /y "%windir%\WindowsUpdate.log" "!_DirWork!\GeneralSystemInfo\_WindowsUpdate.log"
-:: ETL logs collection skiped for now
+:: ETL logs collection - skiped for now
 ::if exist %windir%\Logs\WindowsUpdate (
 ::	call :logitem . get Windows Update ETL Logs
 ::	call :mkNewDir  !_DirWork!\GeneralSystemInfo\_WindowsUpdateEtlLogs
@@ -1194,23 +1219,24 @@ if %ERRORLEVEL% EQU 0 (
 	call :GetReg QUERY "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" /s
 )
 
+call :logOnlyItem . secedit /export /cfg
 set _SecurityFile=!_DirWork!\GeneralSystemInfo\_SecurityCfg.txt
 call :InitLog !_SecurityFile!
 call :logitem . secedit /export /cfg
 secedit /export /cfg !_SecurityFile! >> !_LogFile!
 call :SleepX 1
 
-call :logitem . query drivers information
+call :logOnlyItem . query drivers information
 call :LogCmd !_DirWork!\GeneralSystemInfo\_driverquery.output.csv driverquery /fo csv /v
 
-call :logOnlyItem . reg query RPC settings
+call :logItem . reg query RPC settings
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_RPC_registry_settings.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC" /s
 call :GetReg QUERY "HKLM\Software\Microsoft\Rpc" /s
 
-call :logOnlyItem . reg query Microsoft\OLE
+call :logItem . reg query Microsoft\OLE
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_OLE_registry_settings.txt
 call :InitLog !_RegFile!
@@ -1231,7 +1257,7 @@ call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management" /s
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /s
 
-call :logOnlyItem . Windows Time status/settings
+call :logItem . Windows Time status/settings
 set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :InitLog !_WindowsTimeFile!
@@ -1317,7 +1343,7 @@ call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY TERMSERVER
 call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY PROCESS
 
 
-(:: BranchCache
+:: BranchCache
 call :logitem . collecting branc hcache status and settings
 set _BranchcacheFile=!_DirWork!\GeneralSystemInfo\_BranchCache.txt
 call :InitLog !_BranchcacheFile!
@@ -1333,11 +1359,13 @@ call :logCmd !_BranchcacheFile! bitsadmin /util /version /verbose
 call :logCmd !_BranchcacheFile! bitsadmin /PEERS /LIST
 call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistpub 
 call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistRepub 
-)
 
 
-call :logitem . export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
+:: additional Windows Event Logs
+call :logitem . export additional Windows Event Logs
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :export-evtx Microsoft-Windows-TerminalServices-LocalSessionManager/Operational !_DirWork!\GeneralSystemInfo\
+call :export-evtx Microsoft-Windows-TaskScheduler/Operational !_DirWork!\GeneralSystemInfo\
 
 :: MSPower_DeviceEnable
 call :logItem . MSPower_DeviceEnable query
@@ -1364,7 +1392,7 @@ call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\ComputerName" /s
 @echo ================================================================================== >> "!_outFile!"
 PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{Invoke-WmiMethod -Namespace root\ccm\clientsdk -Class CCM_ClientUtilities -Name DetermineIfRebootPending -ea stop | select IsHardRebootPending,RebootPending,ReturnValue} catch{$_.Exception.Message} ) | out-file '!_outFile!' -Append -Encoding ascii}"
 
-@echo.
+@echo. >> "!_outFile!"
 @echo ================================================================================== >> "!_outFile!"
 @echo ===== %time% : WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call DetermineIfRebootPending>> "!_outFile!"
 @echo ================================================================================== >> "!_outFile!"
@@ -1484,7 +1512,7 @@ call :LogWmicCmd !_DirWork!\_Network\msft_providers.txt wmic path msft_providers
 
 if exist "c:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe" (
 	set _vmtbcmd="C:\Program Files\VMware\VMware Tools\VMwareToolboxCmd.exe"
-	call :logOnlyItem . VMWare status
+	call :logItem . VMWare status
 	call :mkNewDir  !_DirWork!\_Network
 	set _vmStatLog=!_DirWork!\_Network\VMware.stat.txt
 	call :InitLog !_vmStatLog!
@@ -1556,7 +1584,7 @@ if defined _isServer (
 	)
 )
 
-(::CrashDumps - file list & reg settings
+::CrashDumps - file list & reg settings
 call :logitem . create crash dumps list
 call :mkNewDir !_DirWork!\CrashDumps
 set _CrashDumpsList=!_DirWork!\CrashDumps\_CrashDumpsList.txt
@@ -1572,7 +1600,7 @@ call :InitLog !_CrashDumpsList!
 ::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\ServiceProfiles\*.dmp
 ::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\LiveKernelReports\*.dmp
 START "Crash dump files list" /MIN CMD /C "dir /o-d /s %SystemDrive%\*.dmp >> !_CrashDumpsList!" 2>&1
-call :SleepX 1
+call :SleepX 3
 
 call :logitem . crash control registry settings
 set _RegFile=!_DirWork!\CrashDumps\_RegCrashControl.txt
@@ -1586,7 +1614,7 @@ call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File
 
 call :logitem . Recover OS settings
 call :DoCmd  wmic /output:"!_DirWork!\CrashDumps\_recoveros.txt" RECOVEROS
-)
+
 
 where dual_status >NUL 2>&1
 if %errorlevel%==0 (
@@ -1868,8 +1896,7 @@ exit /b 1 -- no cab, end compress
 :endregion
 
 :: Info:
-:: 	- v1.xx see Revision History in SCN file
-::  - v1.05 Add NltestDomInfo; mkCab
+:: 	- v1.xx see git Revision History
 ::  - v1.06 delete working files, if compressed
 ::  - v1.07 updates, fixes, ++ data
 ::  - v1.08 validate input arguments
@@ -1944,3 +1971,7 @@ exit /b 1 -- no cab, end compress
 ::    check pending reboot
 ::    fix Zone.Identifier search
 ::    search %SystemDrive% for crash dump files
+::  - v1.32
+::    skip collection of station backup logs on servers
+::    station backup logs copy - add sleep 500 ms
+::    export "Microsoft-Windows-TaskScheduler/Operational" Events
