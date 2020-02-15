@@ -74,6 +74,8 @@ Usage examples:
   - export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
   - wmic query MSPower_DeviceEnable
   - pending reboot check
+  - Dism /Online /Cleanup-Image /CheckHealth
+  - vssadmin list report
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -145,3 +147,5 @@ Usage examples:
   - chkem /tpsmappings
   - reg query HKLM\SOFTWARE\classes\Hw...
   - check files in Abstract folder for Zone.Identifier stream data
+  - get "%HwProgramData%\Experion PKS\Server\data\mapping\*.xml" files
+  

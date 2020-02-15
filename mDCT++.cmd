@@ -2,6 +2,9 @@
 @if "%_ECHO%" == "" ECHO OFF
 setlocal enableDelayedExpansion
 
+
+set _ScriptVersion=v1.33
+
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
 :: mini DCT +ext batch script file  (krasimir.kumanov@gmail.com)
@@ -70,8 +73,6 @@ echo.done.
 :region initialize
 :initialize
 :: initialize variables
-set _ScriptVersion=v1.32
-:: Last-Update by krasimir.kumanov@gmail.com: 07-Jan-2020
 
 :: change the cmd prompt environment to English
 chcp 437 >NUL
@@ -120,6 +121,16 @@ call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersio
 	) else (
 		@set _isServer=
 	)
+
+:: EXperion Release
+	@set _EPKS_Release=
+	call :GetRegValue "HKLM\SOFTWARE\Wow6432Node\Honeywell\Experion PKS Server" Release _EPKS_Release
+	@set _EPKS_MajorRelease=
+	@if defined _EPKS_Release (
+		set _EPKS_Release=%_EPKS_Release:"=%
+		set _EPKS_MajorRelease=!_EPKS_Release:~0,3!
+	)
+
 
 :: TPSNodeInstallation
 	reg query "HKLM\SOFTWARE\WOW6432Node\Honeywell" /v TPSNodeInstallation >NUL 2>&1
@@ -642,7 +653,8 @@ exit /b
 	SETLOCAL
 	set _AclVerify=!_DirWork!\GeneralSystemInfo\_AclHwVerify.txt
 	call :InitLog !_AclVerify!
-	call :logitem . Experion ACL Verify - "%HwInstallPath%"
+	call :logitem . Experion ACL Verify
+	call :logOnlyItem . Experion ACL Verify - "%HwInstallPath%"
 	@echo.>>!_AclVerify! 
 	@echo ================================================================================== >>!_AclVerify!
 	@echo ===== ICACLS "%HwInstallPath%" /verify /T /C /L /Q >>!_AclVerify!
@@ -650,17 +662,17 @@ exit /b
 	ICACLS "%HwInstallPath%" /verify /T /C /L /Q >>!_AclVerify!
 	@echo.>>!_AclVerify! 
 	
-	call :logitem . Experion ACL Verify - "%HwProgramData%"
+	call :logOnlyItem . Experion ACL Verify - "%HwProgramData%"
 	call :LogCmd !_AclVerify! ICACLS "%HwProgramData%" /verify /T /C /L /Q
 	
-	call :logitem . Experion ACL Verify - HKLM:\SOFTWARE\Honeywell\
+	call :logOnlyItem . Experion ACL Verify - HKLM:\SOFTWARE\Honeywell\
 	@echo.>>!_AclVerify! 
 	@echo ================================================================================== >>!_AclVerify!
 	@echo ===== Get-Acl HKLM:\SOFTWARE\Honeywell\ >>!_AclVerify!
 	@echo ================================================================================== >>!_AclVerify!
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
 	
-	call :logitem . Experion ACL Verify - HKLM:\SOFTWARE\Wow6432Node\Honeywell\
+	call :logOnlyItem . Experion ACL Verify - HKLM:\SOFTWARE\Wow6432Node\Honeywell\
 	@echo.>>!_AclVerify!
 	@echo ================================================================================== >>!_AclVerify!
 	@echo ===== Get-Acl HKLM:\SOFTWARE\Wow6432Node\Honeywell\ >>!_AclVerify!
@@ -1025,7 +1037,7 @@ if %errorlevel%==0 (
 
 where fildmp >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem Experion System Flags Table output
+	call :logitem . Experion System Flags Table output
 	call :mkNewDir !_DirWork!\ServerDataDirectory
     call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\sysflg.output.txt -FILENUM 8 -RECORDS 1 -FORMAT HEX
 	call :logitem Experion Area Asignmnt Table output
@@ -1226,8 +1238,8 @@ call :logitem . secedit /export /cfg
 secedit /export /cfg !_SecurityFile! >> !_LogFile!
 call :SleepX 1
 
-call :logOnlyItem . query drivers information
-call :LogCmd !_DirWork!\GeneralSystemInfo\_driverquery.output.csv driverquery /fo csv /v
+::call :logOnlyItem . query drivers information
+::call :LogCmd !_DirWork!\GeneralSystemInfo\_driverquery.output.csv driverquery /fo csv /v
 
 call :logItem . reg query RPC settings
 call :mkNewDir  !_DirWork!\RegistryInfo
@@ -1254,7 +1266,7 @@ set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
 call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
-call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management" /s
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /s
 
 call :logItem . Windows Time status/settings
@@ -1266,16 +1278,19 @@ call :LogCmd !_WindowsTimeFile! w32tm /query /configuration
 set _RegFile=!_WindowsTimeFile!
 call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s
 
-(:: temperature
+:: temperature
 if not "%_VEP%"=="1" (
-	call :mkNewDir  !_DirWork!\GeneralSystemInfo
-	set _ThermalZoneTemperature="!_DirWork!\GeneralSystemInfo\_ThermalZoneTemperature.txt"
-	call :InitLog !_ThermalZoneTemperature!
-	@echo Temperature at thermal zone in tenths of degrees Kelvin >>!_ThermalZoneTemperature!
-	@echo Convert to Celsius: xxx / 10 - 273.15 >>!_ThermalZoneTemperature!
-	@echo.>>!_ThermalZoneTemperature!
-	wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature | more /s >>!_ThermalZoneTemperature!
-)
+	wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature | find/i "CurrentTemperature" >NUL 2>&1
+	if %errorlevel%==0 (
+		call :logItem . get Windows Thermal Zone Temperature information
+		call :mkNewDir  !_DirWork!\GeneralSystemInfo
+		set _ThermalZoneTemperature="!_DirWork!\GeneralSystemInfo\_ThermalZoneTemperature.txt"
+		call :InitLog !_ThermalZoneTemperature!
+		@echo Temperature at thermal zone in tenths of degrees Kelvin >>!_ThermalZoneTemperature!
+		@echo Convert to Celsius: xxx / 10 - 273.15 >>!_ThermalZoneTemperature!
+		@echo.>>!_ThermalZoneTemperature!
+		wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature | more /s >>!_ThermalZoneTemperature!
+	)
 )
 
 :: get GDI Handles Count
@@ -1376,7 +1391,7 @@ call :InitLog !_MSPower_DeviceEnable!
 call :LogWmicCmd !_MSPower_DeviceEnable! wmic /namespace:\\root\wmi PATH MSPower_DeviceEnable get Active,Enable,InstanceName
 
 
-(:: PendingRebot
+:region PendingRebot
 call :logitem . check pending reboot
 set _outFile=!_DirWork!\GeneralSystemInfo\_PendingRebot.txt
 set _RegFile=!_outFile!
@@ -1397,6 +1412,16 @@ PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@
 @echo ===== %time% : WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call DetermineIfRebootPending>> "!_outFile!"
 @echo ================================================================================== >> "!_outFile!"
 WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call DetermineIfRebootPending 2>>&1| more /s | find /v "" >>!_outFile! 2>>&1
+:endregion PendingRebot
+
+
+:: DISM Check Health
+call :logItem . DISM Check Health
+Dism /Online /Cleanup-Image /CheckHealth | find /i "No component store corruption detected" >NUL 2>&1
+if /i "%errorlevel%" NEQ "0" (
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo
+	call :InitLog !_DirWork!\GeneralSystemInfo\_DISM_CheckHealth.txt
+	call :logCmd !_DirWork!\GeneralSystemInfo\_DISM_CheckHealth.txt Dism /Online /Cleanup-Image /CheckHealth
 )
 
 :: next
@@ -1565,6 +1590,14 @@ if exist "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" (
 	call :mkNewDir !_DirWork!\ServerDataDirectory
 	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\mapping\tps.xml" "!_DirWork!\ServerDataDirectory\_mapping.tps.xml"
 )
+if exist "%HwProgramData%\Experion PKS\Server\data\mapping\" (
+	call :logItem . get mapping xml files
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :mkNewDir !_DirWork!\ServerDataDirectory\_mapping
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\Server\data\mapping\' -filt *.xml | foreach{copy $_.fullName -dest '!_DirWork!\ServerDataDirectory\_mapping'; sleep -Milliseconds 250} }}
+	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at get mapping xml files with PowerShell'. )
+	if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'get mapping xml files with PowerShell' failed.)
+)
 
 if defined _isServer (
 	where lisscn >NUL 2>&1
@@ -1722,6 +1755,15 @@ call :doCmd copy /y "%HwInstallPath%\Experion PKS\Client\Station\Default.stn" "!
 call :doCmd copy /y "%HwInstallPath%\Experion PKS\Client\Station\Factory.stn" "!_DirWork!\Station-logs\@Factory.stn"
 call :doCmd copy /y "%HwInstallPath%\Experion PKS\Client\Station\PanelStation_Default.stn" "!_DirWork!\Station-logs\@PanelStation_Default.stn"
 
+if !_EPKS_MajorRelease! LSS 430 (
+	:: get system flags settings in pre R43x releases
+	where fildmp >NUL 2>&1
+	if %errorlevel%==0 (
+		call :logitem . Experion System Flags Table output
+		call :mkNewDir !_DirWork!\ServerDataDirectory
+		call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\sysflg.output.txt -FILENUM 8 -RECORDS 1 -FORMAT HEX
+	)
+)
 
 goto :eof
 :endregion ExperionAddData
@@ -1975,3 +2017,9 @@ exit /b 1 -- no cab, end compress
 ::    skip collection of station backup logs on servers
 ::    station backup logs copy - add sleep 500 ms
 ::    export "Microsoft-Windows-TaskScheduler/Operational" Events
+::  - v1.33
+::    get Windows Thermal Zone Temperature information - chek if information exists
+::    get EPKS Release number
+::    get system flags settings in pre R43x releases
+::    Dism /Online /Cleanup-Image /CheckHealth
+::    get "%HwProgramData%\Experion PKS\Server\data\mapping\*.xml" files
