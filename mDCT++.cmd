@@ -3,7 +3,7 @@
 setlocal enableDelayedExpansion
 
 
-set _ScriptVersion=v1.33
+set _ScriptVersion=v1.34
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
@@ -406,7 +406,7 @@ goto :eof
 	set _NewDir=%*
 	if not exist "%_NewDir%" mkdir "%_NewDir%"
 	ENDLOCAL & REM -- RETURN VALUES
-	@goto :eof
+	goto :eof
 
 :WriteHost [ forground background message]
 	for /f "tokens=1,2* delims=; " %%a in ("%*") do (
@@ -652,33 +652,35 @@ exit /b
 :ExperionAclVerify    -- Experion Acl Verify
 	SETLOCAL
 	set _AclVerify=!_DirWork!\GeneralSystemInfo\_AclHwVerify.txt
+	call :mkNewDir !_DirWork!\GeneralSystemInfo
 	call :InitLog !_AclVerify!
 	call :logitem . Experion ACL Verify
-	call :logOnlyItem . Experion ACL Verify - "%HwInstallPath%"
-	@echo.>>!_AclVerify! 
-	@echo ================================================================================== >>!_AclVerify!
-	@echo ===== ICACLS "%HwInstallPath%" /verify /T /C /L /Q >>!_AclVerify!
-	@echo ================================================================================== >>!_AclVerify!
-	ICACLS "%HwInstallPath%" /verify /T /C /L /Q >>!_AclVerify!
-	@echo.>>!_AclVerify! 
-	
-	call :logOnlyItem . Experion ACL Verify - "%HwProgramData%"
-	call :LogCmd !_AclVerify! ICACLS "%HwProgramData%" /verify /T /C /L /Q
 	
 	call :logOnlyItem . Experion ACL Verify - HKLM:\SOFTWARE\Honeywell\
 	@echo.>>!_AclVerify! 
 	@echo ================================================================================== >>!_AclVerify!
-	@echo ===== Get-Acl HKLM:\SOFTWARE\Honeywell\ >>!_AclVerify!
+	@echo ===== !time! : Get-Acl HKLM:\SOFTWARE\Honeywell\ >>!_AclVerify!
 	@echo ================================================================================== >>!_AclVerify!
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
 	
 	call :logOnlyItem . Experion ACL Verify - HKLM:\SOFTWARE\Wow6432Node\Honeywell\
 	@echo.>>!_AclVerify!
 	@echo ================================================================================== >>!_AclVerify!
-	@echo ===== Get-Acl HKLM:\SOFTWARE\Wow6432Node\Honeywell\ >>!_AclVerify!
+	@echo ===== !time! : Get-Acl HKLM:\SOFTWARE\Wow6432Node\Honeywell\ >>!_AclVerify!
 	@echo ================================================================================== >>!_AclVerify!
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Wow6432Node\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
 
+	call :logOnlyItem . Experion ACL Verify - "%HwProgramData%\Experion PKS"
+	call :LogCmd !_AclVerify! ICACLS "%HwProgramData%\Experion PKS" /verify /T /C /L /Q
+	
+	call :logOnlyItem . Experion ACL Verify - "%HwInstallPath%\Experion PKS"
+	@echo.>>!_AclVerify! 
+	@echo ================================================================================== >>!_AclVerify!
+	@echo ===== !time! : ICACLS "%HwInstallPath%\Experion PKS" /verify /T /C /L /Q >>!_AclVerify!
+	@echo ================================================================================== >>!_AclVerify!
+	ICACLS "%HwInstallPath%\Experion PKS" /verify /T /C /L /Q >>!_AclVerify!
+	@echo.>>!_AclVerify! 
+	
 	(ENDLOCAL & REM -- RETURN VALUES
 	)
 	exit /b
@@ -715,8 +717,11 @@ pushd "%temp%"
 >>directives.ddf echo .Set UniqueFiles=OFF
 >>directives.ddf echo .Set Cabinet=ON
 >>directives.ddf echo .Set Compress=ON
+if "_isServer"=="1" (
 >>directives.ddf echo .Set CompressionType=MSZIP
-::>>directives.ddf echo .Set CompressionType=LZX
+) else (
+>>directives.ddf echo .Set CompressionType=LZX
+)
 :: save current ASCII code page
 for /f "tokens=2 delims=:" %%i in ('chcp') do set /a _oemcp=%%~ni
 :: change code page to ANSI
@@ -971,6 +976,13 @@ if exist "%HwProgramData%\Experion PKS\Server\data\Report\" (
 	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\Server\data\Report\filrep*.*" "!_DirWork!\ServerDataDirectory\File-Replication\" /s
 )
 
+where actutil >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem Experion point back build
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :doCmd actutil --dump -o !_DirWork!\ServerDataDirectory\actutil.output.txt
+)
+
 where almdmp >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem Experion alarm/event dump
@@ -1037,7 +1049,7 @@ if %errorlevel%==0 (
 
 where fildmp >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem . Experion System Flags Table output
+	call :logitem Experion System Flags Table output
 	call :mkNewDir !_DirWork!\ServerDataDirectory
     call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\sysflg.output.txt -FILENUM 8 -RECORDS 1 -FORMAT HEX
 	call :logitem Experion Area Asignmnt Table output
@@ -1126,9 +1138,9 @@ if /i "!_NoAddData!" EQU "1" (goto :eof)
 
 call :logitem *** Additional data collection ... ***
 
-call :WindowsAddData
-call :NetworkAddData
 call :ExperionAddData
+call :NetworkAddData
+call :WindowsAddData
 call :SqlAddData
 
 goto :eof
@@ -1159,6 +1171,8 @@ call :SleepX 1
 call :logitem . collecting GPResult output
 set _GPresultFile=!_DirWork!\GeneralSystemInfo\_GPresult.htm
 call :doCmd gpresult /h !_GPresultFile! /f
+if "%errorlevel%" neq "0" call :LogCmd !_DirWork!\GeneralSystemInfo\_GPresultZ.txt gpresult /Z
+
 
 call :DoNltestDomInfo
 
@@ -1296,7 +1310,7 @@ if not "%_VEP%"=="1" (
 :: get GDI Handles Count
 call :getGDIHandlesCount
 
-(::localgroups
+:localgroups
 call :logitem . get members of Experion groups
 set _localgroups=!_DirWork!\GeneralSystemInfo\_localgroupsExperion.txt
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
@@ -1309,7 +1323,7 @@ call :LogCmd !_localgroups! net localgroup "Local Operators"
 call :LogCmd !_localgroups! net localgroup "Local SecureComms Administrators"
 call :LogCmd !_localgroups! net localgroup "Local Supervisors"
 call :LogCmd !_localgroups! net localgroup "Local View Only Users"
-)
+call :LogCmd !_localgroups! net localgroup "Distributed COM Users"
 
 call :logitem . get HKEY_USERS Reg Values
 set _RegFile=!_DirWork!\RegistryInfo\_HKEY_USERS.txt
@@ -1414,7 +1428,6 @@ PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@
 WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call DetermineIfRebootPending 2>>&1| more /s | find /v "" >>!_outFile! 2>>&1
 :endregion PendingRebot
 
-
 :: DISM Check Health
 call :logItem . DISM Check Health
 Dism /Online /Cleanup-Image /CheckHealth | find /i "No component store corruption detected" >NUL 2>&1
@@ -1423,6 +1436,18 @@ if /i "%errorlevel%" NEQ "0" (
 	call :InitLog !_DirWork!\GeneralSystemInfo\_DISM_CheckHealth.txt
 	call :logCmd !_DirWork!\GeneralSystemInfo\_DISM_CheckHealth.txt Dism /Online /Cleanup-Image /CheckHealth
 )
+
+:: vssadmin list report
+call :logitem . vssadmin list report
+set _VssAdminListReport=!_DirWork!\GeneralSystemInfo\_VssAdminListReport.txt
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+call :InitLog !_VssAdminListReport!
+call :logCmd !_VssAdminListReport! vssadmin List Providers
+call :logCmd !_VssAdminListReport! vssadmin List Shadows
+call :logCmd !_VssAdminListReport! vssadmin List ShadowStorage
+call :logCmd !_VssAdminListReport! vssadmin List Volumes
+call :logCmd !_VssAdminListReport! vssadmin List Writers
+
 
 :: next
 
@@ -1575,6 +1600,24 @@ goto :eof
 :ExperionAddData
 call :logitem * Experion data *
 
+::CrashDumps - file list & reg settings
+call :logitem . create crash dumps list
+call :mkNewDir !_DirWork!\CrashDumps
+set _CrashDumpsList=!_DirWork!\CrashDumps\_CrashDumpsList.txt
+call :InitLog !_CrashDumpsList!
+::call :logCmd  !_CrashDumpsList! dir %windir%\memory.dmp
+::call :logCmd  !_CrashDumpsList! dir /o:-d %windir%\Minidump\
+::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
+::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
+::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s c:\users\*.dmp
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\System32\config\systemprofile\AppData\Local\CrashDumps\*.dmp
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\SysWOW64\config\systemprofile\AppData\Local\CrashDumps\*.dmp
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\ServiceProfiles\*.dmp
+::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\LiveKernelReports\*.dmp
+START "Crash dump files list" /MIN CMD /C "dir /o-d /s %SystemDrive%\*.dmp >> !_CrashDumpsList!" 2>&1
+call :SleepX 3
+
 if NOT "!_VEP!"=="1" (
 	where filfrag >NUL 2>&1
 	if %errorlevel%==0 (
@@ -1617,23 +1660,6 @@ if defined _isServer (
 	)
 )
 
-::CrashDumps - file list & reg settings
-call :logitem . create crash dumps list
-call :mkNewDir !_DirWork!\CrashDumps
-set _CrashDumpsList=!_DirWork!\CrashDumps\_CrashDumpsList.txt
-call :InitLog !_CrashDumpsList!
-::call :logCmd  !_CrashDumpsList! dir %windir%\memory.dmp
-::call :logCmd  !_CrashDumpsList! dir /o:-d %windir%\Minidump\
-::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\CrashDump"
-::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\HMIWebLog\DumpFiles"
-::call :logCmd  !_CrashDumpsList! dir /o:-d "%HwProgramData%\Experion PKS\server\data\*.dmp"
-::call :logCmd  !_CrashDumpsList! dir  /o-d /s c:\users\*.dmp
-::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\System32\config\systemprofile\AppData\Local\CrashDumps\*.dmp
-::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\SysWOW64\config\systemprofile\AppData\Local\CrashDumps\*.dmp
-::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\ServiceProfiles\*.dmp
-::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\LiveKernelReports\*.dmp
-START "Crash dump files list" /MIN CMD /C "dir /o-d /s %SystemDrive%\*.dmp >> !_CrashDumpsList!" 2>&1
-call :SleepX 3
 
 call :logitem . crash control registry settings
 set _RegFile=!_DirWork!\CrashDumps\_RegCrashControl.txt
@@ -1647,7 +1673,6 @@ call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File
 
 call :logitem . Recover OS settings
 call :DoCmd  wmic /output:"!_DirWork!\CrashDumps\_recoveros.txt" RECOVEROS
-
 
 where dual_status >NUL 2>&1
 if %errorlevel%==0 (
@@ -1687,7 +1712,7 @@ if %errorlevel%==0 (
 
 (call :logitem . list disk resident heap files
 call :mkNewDir !_DirWork!\ServerDataDirectory
-call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\locks" "%HwProgramData%\Experion PKS\Server\data\dual_q" "%HwProgramData%\Experion PKS\Server\data\gda" "%HwProgramData%\Experion PKS\Server\data\tagcache" "%HwProgramData%\Experion PKS\Server\data\taskrequest" "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*"
+call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\locks" "%HwProgramData%\Experion PKS\Server\data\dual_q" "%HwProgramData%\Experion PKS\Server\data\gda" "%HwProgramData%\Experion PKS\Server\data\tagcache" "%HwProgramData%\Experion PKS\Server\data\taskrequest" "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*" "%HwProgramData%\Experion PKS\Server\data\pntxmt_q*" "%HwProgramData%\Experion PKS\Server\data\bacnetheap*" "%HwProgramData%\Experion PKS\Server\data\shheap*"
 )
 
 if exist "%HwProgramData%\Experion PKS\Client\Station\station.ini" (
@@ -1702,9 +1727,10 @@ if exist "%HwProgramData%\HMIWebLog\Log.txt" (
 )
 
 if "%_isTPS%"=="1" (
-	call :logitem . chkem /tpspoints
-	call :mkNewDir !_DirWork!\ServerRunDirectory
-	call :logCmd !_DirWork!\ServerRunDirectory\_tpspoints.txt chkem /tpspoints
+:: !!! chkem /tpspoints - took a too long time for some nodes !!!
+::	call :logitem . chkem /tpspoints
+::	call :mkNewDir !_DirWork!\ServerRunDirectory
+::	call :logCmd !_DirWork!\ServerRunDirectory\_tpspoints.txt chkem /tpspoints
 
 	if "%_isServer%"=="1" (
 		call :logitem . chkem /tpsmappings
@@ -1764,6 +1790,15 @@ if !_EPKS_MajorRelease! LSS 430 (
 		call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\sysflg.output.txt -FILENUM 8 -RECORDS 1 -FORMAT HEX
 	)
 )
+
+where plexus >NUL 2>&1
+if %errorlevel%==0 (
+	call :logItem . plexus -printconfig
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog !_DirWork!\ServerRunDirectory\_plexus.printconfig.txt
+    call :logCmd !_DirWork!\ServerRunDirectory\_plexus.printconfig.txt plexus -printconfig
+)
+
 
 goto :eof
 :endregion ExperionAddData
@@ -2023,3 +2058,11 @@ exit /b 1 -- no cab, end compress
 ::    get system flags settings in pre R43x releases
 ::    Dism /Online /Cleanup-Image /CheckHealth
 ::    get "%HwProgramData%\Experion PKS\Server\data\mapping\*.xml" files
+::    vssadmin list report
+::  - v1.34
+::    net localgroup "Distributed COM Users"
+::    actutil dump output
+::    plexus -printconfig
+::    gpresult /z , if /h failed
+::    search for Experion resident based heap files extended
+::    remove "chkem /tpspoints" - took a too long time for some nodes

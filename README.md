@@ -143,9 +143,9 @@ Usage examples:
     - Display Links files
   - get system station configuration files (Factory.stn, etc.)
   - Backbuild history assignments
-  - chkem /tpspoints
   - chkem /tpsmappings
   - reg query HKLM\SOFTWARE\classes\Hw...
   - check files in Abstract folder for Zone.Identifier stream data
   - get "%HwProgramData%\Experion PKS\Server\data\mapping\*.xml" files
+  - plexus -printconfig
   
