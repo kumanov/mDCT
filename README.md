@@ -1,5 +1,5 @@
 # mDCT++
-mDCT++ : Windows CMD based Data Collection Script toolset v.`2019.04.18`
+mDCT++ : Windows CMD based Data Collection Script toolset v.`current`
 ### Quick Overview of Data Collection Script mDCT++.cmd
 Purpose: Multi-purpose Troubleshooting tool to simplify just-in-time rapid data collection for standard and sporadic issues in in complex Experion environments or collecting data when standard DCT tool have problems.
 
