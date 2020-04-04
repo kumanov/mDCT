@@ -3,7 +3,7 @@
 setlocal enableDelayedExpansion
 
 
-set _ScriptVersion=v1.34
+set _ScriptVersion=v1.35
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
@@ -14,7 +14,7 @@ set _ScriptVersion=v1.34
 ::  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ::  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-@if defined _DbgOut ( echo. %time% : Start of mDCT++)
+@if defined _DbgOut ( echo. .. **  Start of mDCT++)
 :: handle /?
 if "%~1"=="/?" (
 	call :usage
@@ -81,13 +81,13 @@ chcp 437 >NUL
 SET _title=%~nx0 - version %_ScriptVersion%
 TITLE %_title% & set _title=
 
-@if defined _DbgOut ( echo. %time% _DirScript: %_DirScript% )
+@if defined _DbgOut ( echo. .. **  _DirScript: %_DirScript% )
 
 :: Change Directory to the location of the batch script file (%0)
 CD /d "%_DirScript%"
 @echo. .. starting '%_DirScript%%~n0 %*'
 
-::@::if defined _DbgOut ( echo.%time% : Start of mDCT++ ^(%_ScriptVersion% - krasimir.kumanov@gmail.com^))
+::@::if defined _DbgOut ( echo. .. **  Start of mDCT++ ^(%_ScriptVersion% - krasimir.kumanov@gmail.com^))
 call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersion% - krasimir.kumanov@gmail.com]
 
 :region Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -116,6 +116,7 @@ call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersio
 	@set _HSCServerType=
 	(for /f "tokens=2,* delims= " %%h in ('reg query "HKLM\SOFTWARE\Wow6432Node\Honeywell" /v HSCServerType ^| find /i "Server"') do @set _HSCServerType=%%i) 2>NUL
 	:: is Server
+	@if defined _DbgOut ( echo. .. ** _HSCServerType=%_HSCServerType%)
 	if NOT "%_HSCServerType%"=="%_HSCServerType:Server=%" (
 		@set _isServer=1
 	) else (
@@ -162,17 +163,17 @@ if "%PROCESSOR_ARCHITECTURE%" equ "x86" (
 )
 
 set _Comp_Time=%COMPUTERNAME%_%_CurDateTime%
-@if defined _DbgOut ( echo. %time% _Comp_Time: %_Comp_Time% )
+@if defined _DbgOut ( echo. .. **  _Comp_Time: %_Comp_Time% )
 :: set work folder
 set _DirWork=%_DirScript%%_Comp_Time%
 
-@if defined _DbgOut ( echo. %time% _DirWork: !_DirWork! )
+@if defined _DbgOut ( echo. .. **  _DirWork: !_DirWork! )
 
 :: init working dir
 call :mkNewDir !_DirWork!
 :: init LogFile
 if not defined _LogFile set _LogFile=!_DirWork!\mDCTlog.txt
-@if defined _DbgOut ( echo. %time% _LogFile: !_LogFile! )
+@if defined _DbgOut ( echo. .. ** _LogFile: !_LogFile! )
 call :InitLog !_LogFile!
 
 :: change priority to idle - this & all child commands
@@ -248,7 +249,7 @@ goto :eof
 	for /f "tokens=3 delims=." %%o in ('echo %_OSVER%') do @set _OSVER3=%%o
 	for /f "tokens=4 delims=." %%o in ('echo %_OSVER%') do @set _OSVER4=%%o
 	for /f "tokens=4-8 delims=[.] " %%i in ('ver') do (if %%i==Version (set _v=%%j.%%k.%%l.%%m) else (set _v=%%i.%%j.%%k.%%l))
-	@if defined _DbgOut ( echo. %time% ###getWinVer OS: %_OSVER1% %_OSVER2% %_OSVER3% %_OSVER4% Version %_v% )
+	@if defined _DbgOut ( echo. .. ** ###getWinVer OS: %_OSVER1% %_OSVER2% %_OSVER3% %_OSVER4% Version %_v% )
 	:: echo Windows Version: %_v%
 	:: 10.0 - Windows 10		10240 RTM, 10586 TH2 v1511, 14393 RS1 v1607, 15063 RS2 v1703, 16299 RS3 1709, 17134 RS4 1803, 17692 RS5 1809
 	::  6.3 - Windows 8.1 and Windows Server 2012R2 9600
@@ -565,29 +566,29 @@ ENDLOCAL
 call :SleepX 1
 exit /b
 
-:getGropuMembers    -- get group mebers
+:getGroupMembers    -- get group mebers
 ::                 -- %~1 [in]: group name
 ::                 -- %~2 [in]: out file
-SETLOCAL
-set _groupName=%~1
-if defined %1 set _groupName=!%~1!
-set _outFile=%~2
-if defined %2 set _outFile=!%~2!
+	SETLOCAL
+	set _groupName=%~1
+	if defined %1 set _groupName=!%~1!
+	set _outFile=%~2
+	if defined %2 set _outFile=!%~2!
 
->>!_outFile! echo ========================================
->>!_outFile! echo get '!_groupName!' members
->>!_outFile! echo ========================================
-PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { @(try{@(([ADSI]'WinNT://./!_groupName!').Invoke('Members'))}catch{}) | foreach{$_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null)} | Out-File '!_outFile!' -Append -Encoding ascii }}"
-@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - at get '!_groupName!' members with PowerShell. )
-if "%errorlevel%" neq "0" (
-	call :logItem %time% .. ERROR: %errorlevel% - get '!_groupName!' members with PowerShell failed.
-	)
-call :SleepX 1
->>!_outFile! echo.
+	>>!_outFile! echo ========================================
+	>>!_outFile! echo get '!_groupName!' members
+	>>!_outFile! echo ========================================
+	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { @(try{@(([ADSI]'WinNT://./!_groupName!').Invoke('Members'))}catch{}) | foreach{$_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null)} | Out-File '!_outFile!' -Append -Encoding ascii }}"
+	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - at get '!_groupName!' members with PowerShell. )
+	if "%errorlevel%" neq "0" (
+		call :logItem %time% .. ERROR: %errorlevel% - get '!_groupName!' members with PowerShell failed.
+		)
+	call :SleepX 1
+	>>!_outFile! echo.
 
-ENDLOCAL
-call :SleepX 1
-exit /b
+	ENDLOCAL
+	call :SleepX 1
+	exit /b
 
 :GetHkeyUsersRegValues    -- GetHkeyUsersRegValues - output to _RegFile
 ::                 -- %~1 [in,out,opt]: argument description here
@@ -671,6 +672,7 @@ exit /b
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Wow6432Node\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
 
 	call :logOnlyItem . Experion ACL Verify - "%HwProgramData%\Experion PKS"
+	@echo.>>!_AclVerify!
 	call :LogCmd !_AclVerify! ICACLS "%HwProgramData%\Experion PKS" /verify /T /C /L /Q
 	
 	call :logOnlyItem . Experion ACL Verify - "%HwInstallPath%\Experion PKS"
@@ -1274,6 +1276,7 @@ set _RegFile=!_DirWork!\RegistryInfo\_GraphicsDrivers.txt
 call :InitLog !_RegFile!
 call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
 
+@if defined _DbgOut ( echo. .. ** reg query misc)
 call :logOnlyItem . reg query misc
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
@@ -1282,7 +1285,12 @@ call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPE
 call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /s
+:: Art.No: 000102530 - Disable "Updates available" notifications popping up on the operator screen when using WSUS
+call :GetReg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MusNotification.exe"
+call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MusNotificationUx.exe"
 
+@if defined _DbgOut ( echo. .. ** Windows Time status/settings)
 call :logItem . Windows Time status/settings
 set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
@@ -1290,12 +1298,13 @@ call :InitLog !_WindowsTimeFile!
 call :LogCmd !_WindowsTimeFile! w32tm /query /status /verbose
 call :LogCmd !_WindowsTimeFile! w32tm /query /configuration
 set _RegFile=!_WindowsTimeFile!
-call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s
+call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s  /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 
 :: temperature
+@if defined _DbgOut ( echo. .. ** _VEP=%_VEP%)
 if not "%_VEP%"=="1" (
-	wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature | find/i "CurrentTemperature" >NUL 2>&1
-	if %errorlevel%==0 (
+	wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature 2>NUL | find/i "CurrentTemperature" >NUL 2>&1
+	if !errorlevel!==0 (
 		call :logItem . get Windows Thermal Zone Temperature information
 		call :mkNewDir  !_DirWork!\GeneralSystemInfo
 		set _ThermalZoneTemperature="!_DirWork!\GeneralSystemInfo\_ThermalZoneTemperature.txt"
@@ -1303,11 +1312,12 @@ if not "%_VEP%"=="1" (
 		@echo Temperature at thermal zone in tenths of degrees Kelvin >>!_ThermalZoneTemperature!
 		@echo Convert to Celsius: xxx / 10 - 273.15 >>!_ThermalZoneTemperature!
 		@echo.>>!_ThermalZoneTemperature!
-		wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature | more /s >>!_ThermalZoneTemperature!
+		wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature>>!_ThermalZoneTemperature!
 	)
 )
 
 :: get GDI Handles Count
+@if defined _DbgOut ( echo. .. ** getGDIHandlesCount)
 call :getGDIHandlesCount
 
 :localgroups
@@ -1712,7 +1722,7 @@ if %errorlevel%==0 (
 
 (call :logitem . list disk resident heap files
 call :mkNewDir !_DirWork!\ServerDataDirectory
-call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\locks" "%HwProgramData%\Experion PKS\Server\data\dual_q" "%HwProgramData%\Experion PKS\Server\data\gda" "%HwProgramData%\Experion PKS\Server\data\tagcache" "%HwProgramData%\Experion PKS\Server\data\taskrequest" "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*" "%HwProgramData%\Experion PKS\Server\data\pntxmt_q*" "%HwProgramData%\Experion PKS\Server\data\bacnetheap*" "%HwProgramData%\Experion PKS\Server\data\shheap*"
+call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\locks" "%HwProgramData%\Experion PKS\Server\data\dual*q" "%HwProgramData%\Experion PKS\Server\data\gda" "%HwProgramData%\Experion PKS\Server\data\tagcache" "%HwProgramData%\Experion PKS\Server\data\taskrequest" "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*" "%HwProgramData%\Experion PKS\Server\data\pntxmt_q*" "%HwProgramData%\Experion PKS\Server\data\bacnetheap*" "%HwProgramData%\Experion PKS\Server\data\shheap*"
 )
 
 if exist "%HwProgramData%\Experion PKS\Client\Station\station.ini" (
@@ -1726,13 +1736,10 @@ if exist "%HwProgramData%\HMIWebLog\Log.txt" (
 	call :getStationFiles
 )
 
-if "%_isTPS%"=="1" (
-:: !!! chkem /tpspoints - took a too long time for some nodes !!!
-::	call :logitem . chkem /tpspoints
-::	call :mkNewDir !_DirWork!\ServerRunDirectory
-::	call :logCmd !_DirWork!\ServerRunDirectory\_tpspoints.txt chkem /tpspoints
-
-	if "%_isServer%"=="1" (
+@if defined _DbgOut ( echo. .. ** _isTPS=!_isTPS!)
+if "!_isTPS!"=="1" (
+	@if defined _DbgOut ( echo. .. ** _isServer=!_isServer!)
+	if "!_isServer!"=="1" (
 		call :logitem . chkem /tpsmappings
 		call :mkNewDir !_DirWork!\ServerRunDirectory
 		call :logCmd !_DirWork!\ServerRunDirectory\_tpsmappings.txt chkem /tpsmappings
@@ -1797,6 +1804,12 @@ if %errorlevel%==0 (
 	call :mkNewDir !_DirWork!\ServerRunDirectory
 	call :InitLog !_DirWork!\ServerRunDirectory\_plexus.printconfig.txt
     call :logCmd !_DirWork!\ServerRunDirectory\_plexus.printconfig.txt plexus -printconfig
+)
+
+if exist "%HwProgramData%\Experion PKS\Server\data\flbkup.def" (
+	call :logitem . copy flbkup.def file
+	call :mkNewDir !_DirWork!\Station-logs
+	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\flbkup.def" "!_DirWork!\ServerDataDirectory\_flbkup.def"
 )
 
 
@@ -2065,4 +2078,9 @@ exit /b 1 -- no cab, end compress
 ::    plexus -printconfig
 ::    gpresult /z , if /h failed
 ::    search for Experion resident based heap files extended
+::  - v1.35
 ::    remove "chkem /tpspoints" - took a too long time for some nodes
+::    get Windows Thermal Zone Temperature information - chek if information exists - fix
+::    search for dual*q resident heap file, not only for dual_q
+::    Reg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
+::    copy flbkup.def file

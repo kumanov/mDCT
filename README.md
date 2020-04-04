@@ -148,4 +148,5 @@ Usage examples:
   - check files in Abstract folder for Zone.Identifier stream data
   - get "%HwProgramData%\Experion PKS\Server\data\mapping\*.xml" files
   - plexus -printconfig
+  - get Experion flbkup.def file
   
