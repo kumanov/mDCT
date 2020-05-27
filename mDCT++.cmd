@@ -3,7 +3,7 @@
 setlocal enableDelayedExpansion
 
 
-set _ScriptVersion=v1.35
+set _ScriptVersion=v1.37
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
@@ -37,6 +37,8 @@ if "%errorlevel%"=="0" (
 	RD /S /Q "!_DirWork!")
 )
 echo.done.
+:: restore cmd title
+title Command Prompt
 @echo. & goto :eof
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -334,6 +336,10 @@ goto :eof
 	)
 	@goto :eof
 
+:logLine [_LogFile]
+	@echo ================================================================================== >> %1
+	@goto :eof
+
 :logitem  - UTILITY to write a message to the log file (no indent) and screen
 	@echo %date% %time% : %* >> "!_LogFile!"
 	@echo %time% : %*
@@ -353,18 +359,18 @@ goto :eof
 	@goto :eof
 
 :doCmd  - UTILITY log execution and output of a command to the current log file
-	@echo ================================================================================== >> "!_LogFile!"
+	call :logLine "!_LogFile!"
 	@echo ===== %time% : %* >> "!_LogFile!"
-	@echo ================================================================================== >> "!_LogFile!"
+	call :logLine "!_LogFile!"
 	%* >> %_LogFile% 2>&1
 	@echo. >> "!_LogFile!"
 	call :SleepX 1
 	@goto :eof
 
 :doCmdNoLog  - UTILITY log execution of a command to the current log file
-	@echo ================================================================================== >> "!_LogFile!"
+	call :logLine "!_LogFile!"
 	@echo ===== %time% : %* >> !_LogFile!
-	@echo ================================================================================== >> "!_LogFile!"
+	call :logLine "!_LogFile!"
 	%*
 	@echo. >> "!_LogFile!"
 	@goto :eof
@@ -373,9 +379,9 @@ goto :eof
 	SETLOCAL
 	for /f "tokens=1* delims=; " %%a in ("%*") do (
 		set _LogFileName=%%a
-		@echo ================================================================================== >> "!_LogFileName!"
+		call :logLine "!_LogFileName!"
 		@echo ===== %time% : %%b >> "!_LogFileName!"
-		@echo ================================================================================== >> "!_LogFileName!"
+		call :logLine "!_LogFileName!"
 		%%b >> "!_LogFileName!" 2>&1
 	)
 	@echo. >> "!_LogFileName!"
@@ -387,9 +393,9 @@ goto :eof
 	SETLOCAL
 	for /f "tokens=1* delims=; " %%a in ("%*") do (
 		set _LogFileName=%%a
-		@echo ================================================================================== >> "!_LogFileName!"
+		call :logLine "!_LogFileName!"
 		@echo ===== %time% : %%b >> "!_LogFileName!"
-		@echo ================================================================================== >> "!_LogFileName!"
+		call :logLine "!_LogFileName!"
 		::%%b /Format:Texttable | more /s >> "!_LogFileName!" 2>&1
 		For /F "tokens=* delims=" %%h in ('%%b') do (
 			set "_line=%%h"
@@ -430,9 +436,9 @@ goto :eof
 
 :GetReg
 	@echo.>> %_RegFile%
-	@echo ================================================================================== >> %_RegFile%
+	call :logLine %_RegFile%
 	@echo ===== %time% : REG.EXE %* >> %_RegFile%
-	@echo ================================================================================== >> %_RegFile%
+	call :logLine %_RegFile%
 	%SYSTEMROOT%\SYSTEM32\REG.EXE %* >> %_RegFile% 2>&1
 	@goto :eof
 
@@ -465,9 +471,9 @@ for /f "tokens=2,* delims= " %%a in ('reg query "%Key%" %v%^|findstr /b "....%ma
 EXIT /b
 
 :DoSqlCmd [database query] - run sql query
-	@echo ================================================================================== >> %_SqlFile%
+	call :logLine %_SqlFile%
 	@echo ===== %time% : sqlcmd DB:%~1 Q:%~2 >> %_SqlFile%
-	@echo ================================================================================== >> %_SqlFile%
+	call :logLine %_SqlFile%
 	sqlcmd -E -w 10000 -d "%~1" -Q "%~2" >> %_SqlFile% 2>&1
 	@echo. >> %_SqlFile%
 	@goto :eof
@@ -652,23 +658,23 @@ exit /b
 
 :ExperionAclVerify    -- Experion Acl Verify
 	SETLOCAL
-	set _AclVerify=!_DirWork!\GeneralSystemInfo\_AclHwVerify.txt
+	set _AclVerify="!_DirWork!\GeneralSystemInfo\_AclHwVerify.txt"
 	call :mkNewDir !_DirWork!\GeneralSystemInfo
 	call :InitLog !_AclVerify!
 	call :logitem . Experion ACL Verify
 	
 	call :logOnlyItem . Experion ACL Verify - HKLM:\SOFTWARE\Honeywell\
 	@echo.>>!_AclVerify! 
-	@echo ================================================================================== >>!_AclVerify!
+	call :logLine !_AclVerify!
 	@echo ===== !time! : Get-Acl HKLM:\SOFTWARE\Honeywell\ >>!_AclVerify!
-	@echo ================================================================================== >>!_AclVerify!
+	call :logLine !_AclVerify!
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
 	
 	call :logOnlyItem . Experion ACL Verify - HKLM:\SOFTWARE\Wow6432Node\Honeywell\
 	@echo.>>!_AclVerify!
-	@echo ================================================================================== >>!_AclVerify!
+	call :logLine !_AclVerify!
 	@echo ===== !time! : Get-Acl HKLM:\SOFTWARE\Wow6432Node\Honeywell\ >>!_AclVerify!
-	@echo ================================================================================== >>!_AclVerify!
+	call :logLine !_AclVerify!
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Wow6432Node\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
 
 	call :logOnlyItem . Experion ACL Verify - "%HwProgramData%\Experion PKS"
@@ -677,15 +683,34 @@ exit /b
 	
 	call :logOnlyItem . Experion ACL Verify - "%HwInstallPath%\Experion PKS"
 	@echo.>>!_AclVerify! 
-	@echo ================================================================================== >>!_AclVerify!
+	call :logLine !_AclVerify!
 	@echo ===== !time! : ICACLS "%HwInstallPath%\Experion PKS" /verify /T /C /L /Q >>!_AclVerify!
-	@echo ================================================================================== >>!_AclVerify!
-	ICACLS "%HwInstallPath%\Experion PKS" /verify /T /C /L /Q >>!_AclVerify!
+	call :logLine !_AclVerify!
+	rem too slow on R511 with "User Assistance" installed - skip
+	if not exist "%HwInstallPath%\Experion PKS\User Assistance" (
+		ICACLS "%HwInstallPath%\Experion PKS" /verify /T /C /L /Q >>!_AclVerify!
+	)
 	@echo.>>!_AclVerify! 
 	
 	(ENDLOCAL & REM -- RETURN VALUES
 	)
 	exit /b
+
+:isEmpty    -- function description here
+::                 -- %~1 [in]: file to check
+::                 -- %~1 [out,opt]: out var
+SETLOCAL
+@if defined _DbgOut ( echo. .. **  function isEmpty - file: %~f1 , size: %~z1 )
+if %~z1 == 0 (
+	set __isEmpty=1
+) else (
+	set __isEmpty=
+)
+(ENDLOCAL & REM -- RETURN VALUES
+	IF "%~2" NEQ "" SET %~2=%__isEmpty%
+)
+exit /b
+
 
 :myFunctionName    -- function description here
 ::                 -- %~1 [in,out,opt]: argument description here
@@ -866,7 +891,7 @@ call :logitem *** DCT data collection ... ***
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 
 call :logitem MSInfo32 report
-call :doCmd msinfo32 /report !_DirWork!\GeneralSystemInfo\MSInfo32.txt
+call :doCmd msinfo32 /report "!_DirWork!\GeneralSystemInfo\MSInfo32.txt"
 
 call :logitem Windows hosts file copy
 call :doCmd copy /y %windir%\System32\drivers\etc\hosts "!_DirWork!\GeneralSystemInfo\"
@@ -897,14 +922,16 @@ call :doCmd copy /y "%HwInstallPath%\Experion PKS\ProductVersion.txt" "!_DirWork
 
 call :logitem query services
 call :DoGetSVC %time%
+:: one more second to sleep
+call :SleepX 1
 
-(call :logitem export Experion registry settings
+call :logitem export Experion registry settings
 call :mkNewDir  "!_DirWork!\RegistryInfo"
 if exist %windir%\SysWOW64\regedit.exe (set _regedit="%windir%\SysWOW64\regedit.exe") else (set _regedit=regedit.exe)
-call :doCmd !_regedit! /E !_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt "HKEY_CURRENT_USER\Software\Honeywell"
-call :doCmd !_regedit! /E !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt "HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell"
-call :doCmd !_regedit! /E !_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Microsoft_Uninstall.txt "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-)
+call :doCmd !_regedit! /E "!_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt" "HKEY_CURRENT_USER\Software\Honeywell"
+call :doCmd !_regedit! /E "!_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt" "HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell"
+call :doCmd !_regedit! /E "!_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Microsoft_Uninstall.txt" "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+
 
 call :logitem get FTE logs
 ::@::call :doCmd xcopy /s/e/i/q/y/H "%HwProgramData%\ProductConfig\FTE\*.log" "!_DirWork!\FTELogs\"
@@ -982,7 +1009,7 @@ where actutil >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem Experion point back build
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd actutil --dump -o !_DirWork!\ServerDataDirectory\actutil.output.txt
+    call :doCmd actutil --dump -o "!_DirWork!\ServerDataDirectory\actutil.output.txt"
 )
 
 where almdmp >NUL 2>&1
@@ -1009,14 +1036,14 @@ where bckbld >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem Experion point back build
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd bckbld -out !_DirWork!\ServerDataDirectory\back_build.output.txt
+    call :doCmd bckbld -out "!_DirWork!\ServerDataDirectory\back_build.output.txt"
 )
 
 where hdwbckbld >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem Experion hardware back build
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd hdwbckbld -out !_DirWork!\ServerDataDirectory\hardware_back_build.output.txt
+    call :doCmd hdwbckbld -out "!_DirWork!\ServerDataDirectory\hardware_back_build.output.txt"
 )
 
 where hstdiag >NUL 2>&1
@@ -1030,10 +1057,10 @@ where embckbuilder >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem Experion embckbuilder output
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.alarmgroup.output.txt  -ALARMGROUP
-    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.asset.output.txt  -ASSET
-    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.network.output.txt  -NETWORK
-    call :doCmd embckbuilder  !_DirWork!\ServerDataDirectory\embckbuilder.system.output.txt  -SYSTEM
+    call :doCmd embckbuilder  "!_DirWork!\ServerDataDirectory\embckbuilder.alarmgroup.output.txt"  -ALARMGROUP
+    call :doCmd embckbuilder  "!_DirWork!\ServerDataDirectory\embckbuilder.asset.output.txt"       -ASSET
+    call :doCmd embckbuilder  "!_DirWork!\ServerDataDirectory\embckbuilder.network.output.txt"     -NETWORK
+    call :doCmd embckbuilder  "!_DirWork!\ServerDataDirectory\embckbuilder.system.output.txt"      -SYSTEM
 )
 
 if exist "%HwProgramData%\Experion PKS\Server\data\OPCIntegrator\" (
@@ -1053,9 +1080,9 @@ where fildmp >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem Experion System Flags Table output
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\sysflg.output.txt -FILENUM 8 -RECORDS 1 -FORMAT HEX
+    call :doCmd fildmp -DUMP -FILE "!_DirWork!\ServerDataDirectory\sysflg.output.txt" -FILENUM 8 -RECORDS 1 -FORMAT HEX
 	call :logitem Experion Area Asignmnt Table output
-    call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\areaasignmnt.output.txt -FILENUM 7 -RECORDS 1,1001 -FORMAT HEX
+    call :doCmd fildmp -DUMP -FILE "!_DirWork!\ServerDataDirectory\areaasignmnt.output.txt" -FILENUM 7 -RECORDS 1,1001 -FORMAT HEX
 )
 
 if exist "%HwProgramData%\Experion PKS\Server\data\system.build" (
@@ -1172,14 +1199,14 @@ call :SleepX 1
 
 call :logitem . collecting GPResult output
 set _GPresultFile=!_DirWork!\GeneralSystemInfo\_GPresult.htm
-call :doCmd gpresult /h !_GPresultFile! /f
+call :doCmd gpresult /h "!_GPresultFile!" /f
 if "%errorlevel%" neq "0" call :LogCmd !_DirWork!\GeneralSystemInfo\_GPresultZ.txt gpresult /Z
 
 
 call :DoNltestDomInfo
 
 call :logitem . get power configuration settings
-set _powerCfgFile=!_DirWork!\GeneralSystemInfo\_powercfg.txt
+set _powerCfgFile="!_DirWork!\GeneralSystemInfo\_powercfg.txt"
 call :InitLog !_powerCfgFile!
 call :LogCmd !_powerCfgFile! powercfg -Q
 :: reg query power settings
@@ -1202,11 +1229,11 @@ if exist "%HwInstallPath%\\Experion PKS\Install\Honeywell_MsPatches.txt" (
 	call :doCmd copy /y "%HwInstallPath%\\Experion PKS\Install\Honeywell_MsPatches.txt" "!_DirWork!\GeneralSystemInfo\_Honeywell_MsPatches.txt"
 )
 if exist "%windir%\honeywell_installed_updates.txt" (
-	call :logitem . get Honeywell_MsPatches.txt
+	call :logitem . get honeywell_installed_updates.txt
 	call :doCmd copy /y "%windir%\honeywell_installed_updates.txt" "!_DirWork!\GeneralSystemInfo\_honeywell_installed_updates.txt"
 )
 if exist "%windir%\honeywell_required_patches.txt" (
-	call :logitem . get Honeywell_MsPatches.txt
+	call :logitem . get honeywell_required_patches.txt
 	call :doCmd copy /y "%windir%\honeywell_required_patches.txt" "!_DirWork!\GeneralSystemInfo\_honeywell_required_patches.txt"
 )
 if exist "%HwInstallPath%\Experion PKS\Install\honeywell_required_patches.log" (
@@ -1224,17 +1251,20 @@ call :doCmd copy /y "%windir%\WindowsUpdate.log" "!_DirWork!\GeneralSystemInfo\_
 ::	call :doCmd copy /y "%windir%\Logs\WindowsUpdate\*.etl" "!_DirWork!\GeneralSystemInfo\_WindowsUpdateEtlLogs\"
 ::)
 
-:WmiRootSecurityDescriptor
-call :logitem . WMI Root Security Descriptor
-call :doCmd  wmic /output:"!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt" /namespace:\\root path __systemsecurity call GetSecurityDescriptor
+:WmiConfiguration
+call :logitem . WMI Configuration
+::WmiRootSecurityDescriptor
+call :LogWmicCmd "!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt" wmic /namespace:\\root path __systemsecurity call GetSecurityDescriptor
+:: WMI Provider Host Quota Configuration
+call :LogWmicCmd "!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt" wmic /namespace:\\root path __ProviderHostQuotaConfiguration
 
 :: McAfee on accesss scanner settings
 reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
 	call :logitem . McAfee On Access Scanner - reg settings
-	::call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
+	::call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" "!_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt"
 	call :mkNewDir  !_DirWork!\RegistryInfo
-	call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore" !_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt
+	call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore" "!_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt"
 )
 
 :: Symantec\Symantec Endpoint Protection\AV
@@ -1242,7 +1272,7 @@ reg query "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" >
 if %ERRORLEVEL% EQU 0 (
 	call :logitem . Symantec Endpoint Protection / AV - reg settings
 	call :mkNewDir  !_DirWork!\RegistryInfo
-	set _RegFile=!_DirWork!\RegistryInfo\_Symantec_SEP_AV.txt
+	set _RegFile="!_DirWork!\RegistryInfo\_Symantec_SEP_AV.txt"
 	call :InitLog !_RegFile!
 	call :GetReg QUERY "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" /s
 )
@@ -1250,7 +1280,6 @@ if %ERRORLEVEL% EQU 0 (
 call :logOnlyItem . secedit /export /cfg
 set _SecurityFile=!_DirWork!\GeneralSystemInfo\_SecurityCfg.txt
 call :InitLog !_SecurityFile!
-call :logitem . secedit /export /cfg
 secedit /export /cfg !_SecurityFile! >> !_LogFile!
 call :SleepX 1
 
@@ -1259,21 +1288,23 @@ call :SleepX 1
 
 call :logItem . reg query RPC settings
 call :mkNewDir  !_DirWork!\RegistryInfo
-set _RegFile=!_DirWork!\RegistryInfo\_RPC_registry_settings.txt
+set _RegFile="!_DirWork!\RegistryInfo\_RPC_registry_settings.txt"
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC" /s
 call :GetReg QUERY "HKLM\Software\Microsoft\Rpc" /s
 
 call :logItem . reg query Microsoft\OLE
 call :mkNewDir  !_DirWork!\RegistryInfo
-set _RegFile=!_DirWork!\RegistryInfo\_OLE_registry_settings.txt
+set _RegFile="!_DirWork!\RegistryInfo\_OLE_registry_settings.txt"
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\Software\Microsoft\OLE" /s
 
 call :logOnlyItem . reg query Graphics Drivers
 call :mkNewDir  !_DirWork!\RegistryInfo
-set _RegFile=!_DirWork!\RegistryInfo\_GraphicsDrivers.txt
+set _RegFile="!_DirWork!\RegistryInfo\_GraphicsDrivers.txt"
 call :InitLog !_RegFile!
+call :GetReg QUERY  "HKCU\Control Panel\Desktop" /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg QUERY  "HKCU\Control Panel\Desktop\PerMonitorSettings" /s
 call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
 
 @if defined _DbgOut ( echo. .. ** reg query misc)
@@ -1289,10 +1320,19 @@ call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /s
 call :GetReg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /s
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MusNotification.exe"
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MusNotificationUx.exe"
+:: acronis registry settings
+reg query "HKLM\SOFTWARE\Wow6432Node\Acronis" >NUL 2>&1
+if %ERRORLEVEL% EQU 0 (
+call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Acronis"
+)
+reg query "HKLM\SOFTWARE\Acronis" >NUL 2>&1
+if %ERRORLEVEL% EQU 0 (
+call :GetReg QUERY "HKLM\SOFTWARE\Acronis"
+)
 
 @if defined _DbgOut ( echo. .. ** Windows Time status/settings)
 call :logItem . Windows Time status/settings
-set _WindowsTimeFile=!_DirWork!\GeneralSystemInfo\_WindowsTime.txt
+set _WindowsTimeFile="!_DirWork!\GeneralSystemInfo\_WindowsTime.txt"
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :InitLog !_WindowsTimeFile!
 call :LogCmd !_WindowsTimeFile! w32tm /query /status /verbose
@@ -1383,7 +1423,7 @@ call :LogCmd !_DirWork!\GeneralSystemInfo\_query.output.txt QUERY PROCESS
 
 
 :: BranchCache
-call :logitem . collecting branc hcache status and settings
+call :logitem . collecting branch cache status and settings
 set _BranchcacheFile=!_DirWork!\GeneralSystemInfo\_BranchCache.txt
 call :InitLog !_BranchcacheFile!
 call :logCmd !_BranchcacheFile! netsh branchcache show hostedcache
@@ -1417,24 +1457,25 @@ call :LogWmicCmd !_MSPower_DeviceEnable! wmic /namespace:\\root\wmi PATH MSPower
 
 :region PendingRebot
 call :logitem . check pending reboot
-set _outFile=!_DirWork!\GeneralSystemInfo\_PendingRebot.txt
+set _outFile="!_DirWork!\GeneralSystemInfo\_PendingRebot.txt"
 set _RegFile=!_outFile!
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :InitLog !_outFile!
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing" /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update" /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager" /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Services\Netlogon"
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\ComputerName" /s
 
-@echo ================================================================================== >> "!_outFile!"
+call :logLine "!_outFile!"
 @echo ===== %time% :PS: Invoke-WmiMethod -Namespace root\ccm\clientsdk -Class CCM_ClientUtilities -Name DetermineIfRebootPending>> "!_outFile!"
-@echo ================================================================================== >> "!_outFile!"
+call :logLine "!_outFile!"
 PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{Invoke-WmiMethod -Namespace root\ccm\clientsdk -Class CCM_ClientUtilities -Name DetermineIfRebootPending -ea stop | select IsHardRebootPending,RebootPending,ReturnValue} catch{$_.Exception.Message} ) | out-file '!_outFile!' -Append -Encoding ascii}"
 
 @echo. >> "!_outFile!"
-@echo ================================================================================== >> "!_outFile!"
+call :logLine "!_outFile!"
 @echo ===== %time% : WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call DetermineIfRebootPending>> "!_outFile!"
-@echo ================================================================================== >> "!_outFile!"
+call :logLine "!_outFile!"
 WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call DetermineIfRebootPending 2>>&1| more /s | find /v "" >>!_outFile! 2>>&1
 :endregion PendingRebot
 
@@ -1457,6 +1498,57 @@ call :logCmd !_VssAdminListReport! vssadmin List Shadows
 call :logCmd !_VssAdminListReport! vssadmin List ShadowStorage
 call :logCmd !_VssAdminListReport! vssadmin List Volumes
 call :logCmd !_VssAdminListReport! vssadmin List Writers
+
+:: omreport
+where omreport >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem . omreport storage vdisk controller=0
+	call :mkNewDir !_DirWork!\GeneralSystemInfo
+	call :InitLog !_DirWork!\GeneralSystemInfo\_omreport.txt
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system alertlog
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system esmlog
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system cmdlog
+	
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system operatingsystem
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system summary
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system version
+
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis pwrmonitoring
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis pwrmanagement
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis pwrsupplies
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis fans
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis memory
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis nics
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis processors
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis temps
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis volts
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis batteries
+	
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport storage pdisk controller=0
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport storage vdisk
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport storage controller
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport storage battery
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport storage connector controller=0
+)
+
+:: logon scripts (operators)
+call :mkNewDir  !_DirWork!\GeneralSystemInfo
+if exist %windir%\SYSVOL\domain\scripts\*.bat set _domainScripts=1
+if exist %windir%\SYSVOL\domain\scripts\*.cmd set _domainScripts=1
+if defined _domainScripts (
+	call :logOnlyItem operator logon scripts - %windir%\SYSVOL\domain\scripts\
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo\_scripts
+	call :doCmd copy /y %windir%\SYSVOL\domain\scripts\*.bat "!_DirWork!\GeneralSystemInfo\_scripts\"
+	call :doCmd copy /y %windir%\SYSVOL\domain\scripts\*.cmd "!_DirWork!\GeneralSystemInfo\_scripts\"
+)
+if exist %windir%\System32\repl\import\scripts\\*.bat set _replImportScripts=1
+if exist %windir%\System32\repl\import\scripts\\*.cmd set _replImportScripts=1
+if defined _replImportScripts (
+	call :logOnlyItem operator logon scripts - %windir%\System32\repl\import\scripts\
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo\_scripts
+	call :doCmd copy /y %windir%\System32\repl\import\scripts\*.bat "!_DirWork!\GeneralSystemInfo\_scripts\"
+	call :doCmd copy /y %windir%\System32\repl\import\scripts\*.cmd "!_DirWork!\GeneralSystemInfo\_scripts\"
+)
 
 
 :: next
@@ -1530,7 +1622,7 @@ call :LogCmd !_DirWork!\_Network\nbtstat.txt  nbtstat -n
 call :logitem . firewall rules
 call :InitLog !_DirWork!\_Network\firewall_rules.txt
 call :LogCmd !_DirWork!\_Network\firewall_rules.txt netsh advfirewall monitor show firewall verbose
-if exist %windir%\system32\LogFiles\Firewall\pfirewall.log call :doCmd Copy /y %windir%\system32\LogFiles\Firewall\pfirewall.log !_DirWork!\_Network\_pFirewall.log
+if exist %windir%\system32\LogFiles\Firewall\pfirewall.log call :doCmd Copy /y %windir%\system32\LogFiles\Firewall\pfirewall.log "!_DirWork!\_Network\_pFirewall.log"
 
 call :logitem . net commands
 set _NetCmdFile=!_DirWork!\_Network\netcmd.txt
@@ -1657,16 +1749,16 @@ if defined _isServer (
 	if %errorlevel%==0 (
 		call :logitem . lisscn output
 		call :mkNewDir !_DirWork!\ServerDataDirectory
-		call :doCmd lisscn -all_ref -OUT !_DirWork!\ServerDataDirectory\_lisscn_all.txt
-		call :doCmd lisscn -OUT !_DirWork!\ServerDataDirectory\_lisscn.txt
+		call :doCmd lisscn -all_ref -OUT "!_DirWork!\ServerDataDirectory\_lisscn_all.txt"
+		call :doCmd lisscn -OUT "!_DirWork!\ServerDataDirectory\_lisscn.txt"
 	)
 
 	where dsasublist >NUL 2>&1
 	if %errorlevel%==0 (
 		call :logitem . dsasublist
-		call :mkNewDir !_DirWork!\ServerDataDirectory
-		call :InitLog !_DirWork!\ServerDataDirectory\_dsasublist.txt
-		call :logCmd !_DirWork!\ServerDataDirectory\_dsasublist.txt dsasublist
+		call :mkNewDir !_DirWork!\ServerRunDirectory
+		call :InitLog !_DirWork!\ServerRunDirectory\_dsasublist.txt
+		call :logCmd !_DirWork!\ServerRunDirectory\_dsasublist.txt dsasublist
 	)
 )
 
@@ -1720,10 +1812,36 @@ if %errorlevel%==0 (
     call :logCmd  !_DirWork!\ServerDataDirectory\_shheap.2.dump.output.txt shheap 2 dump
 )
 
-(call :logitem . list disk resident heap files
+call :logitem . list disk resident heap files
 call :mkNewDir !_DirWork!\ServerDataDirectory
-call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\locks" "%HwProgramData%\Experion PKS\Server\data\dual*q" "%HwProgramData%\Experion PKS\Server\data\gda" "%HwProgramData%\Experion PKS\Server\data\tagcache" "%HwProgramData%\Experion PKS\Server\data\taskrequest" "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*" "%HwProgramData%\Experion PKS\Server\data\pntxmt_q*" "%HwProgramData%\Experion PKS\Server\data\bacnetheap*" "%HwProgramData%\Experion PKS\Server\data\shheap*"
+if exist "%HwProgramData%\Experion PKS\Server\data\locks" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\locks"
 )
+if exist "%HwProgramData%\Experion PKS\Server\data\dual*q" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\dual*q"
+)
+if exist "%HwProgramData%\Experion PKS\Server\data\gda" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\gda"
+)
+if exist "%HwProgramData%\Experion PKS\Server\data\tagcache" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\tagcache"
+)
+if exist "%HwProgramData%\Experion PKS\Server\data\taskrequest" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\taskrequest"
+)
+if exist "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\dbrepsrvup*"
+)
+if exist "%HwProgramData%\Experion PKS\Server\data\pntxmt_q*" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\pntxmt_q*"
+)
+if exist "%HwProgramData%\Experion PKS\Server\data\bacnetheap*" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\bacnetheap*"
+)
+if exist "%HwProgramData%\Experion PKS\Server\data\shheap*" (
+	call :logCmd !_DirWork!\ServerDataDirectory\_DiskResidentHeaps.txt dir "%HwProgramData%\Experion PKS\Server\data\shheap*"
+)
+
 
 if exist "%HwProgramData%\Experion PKS\Client\Station\station.ini" (
 	call :logitem . copy station.ini file
@@ -1750,10 +1868,10 @@ where bckbld >NUL 2>&1
 if %errorlevel%==0 (
 	call :logitem . Backbuild history assignments
 	call :mkNewDir !_DirWork!\ServerDataDirectory
-    call :doCmd bckbld -np -nt -ng -ns -out !_DirWork!\ServerDataDirectory\_hist_scada.txt
-    call :doCmd bckbld -np -nt -ng -ns -tag CDA -out !_DirWork!\ServerDataDirectory\_hist_cda.txt
-    call :doCmd bckbld -np -nt -ng -ns -tag RDA -out !_DirWork!\ServerDataDirectory\_hist_dsa.txt
-    call :doCmd bckbld -np -nt -ng -ns -tag PSA -out !_DirWork!\ServerDataDirectory\_hist_psa.txt
+    call :doCmd bckbld -np -nt -ng -ns -out "!_DirWork!\ServerDataDirectory\_hist_scada.txt"
+    call :doCmd bckbld -np -nt -ng -ns -tag CDA -out "!_DirWork!\ServerDataDirectory\_hist_cda.txt"
+    call :doCmd bckbld -np -nt -ng -ns -tag RDA -out "!_DirWork!\ServerDataDirectory\_hist_dsa.txt"
+    call :doCmd bckbld -np -nt -ng -ns -tag PSA -out "!_DirWork!\ServerDataDirectory\_hist_psa.txt"
 )
 
 :: HKLM\SOFTWARE\classes\Hw...
@@ -1794,7 +1912,7 @@ if !_EPKS_MajorRelease! LSS 430 (
 	if %errorlevel%==0 (
 		call :logitem . Experion System Flags Table output
 		call :mkNewDir !_DirWork!\ServerDataDirectory
-		call :doCmd fildmp -DUMP -FILE !_DirWork!\ServerDataDirectory\sysflg.output.txt -FILENUM 8 -RECORDS 1 -FORMAT HEX
+		call :doCmd fildmp -DUMP -FILE "!_DirWork!\ServerDataDirectory\sysflg.output.txt" -FILENUM 8 -RECORDS 1 -FORMAT HEX
 	)
 )
 
@@ -1812,6 +1930,57 @@ if exist "%HwProgramData%\Experion PKS\Server\data\flbkup.def" (
 	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\flbkup.def" "!_DirWork!\ServerDataDirectory\_flbkup.def"
 )
 
+:: search read only files in history archives
+call :logitem . search read only files in history archives
+if "!_xOS!"=="64" (set _regEPKS=HKLM\SOFTWARE\Wow6432Node\Honeywell\Experion PKS Server) ELSE (set _regEPKS=HKLM\SOFTWARE\Honeywell\Experion PKS Server)
+@set _ArchiveDirectory=
+call :GetRegValue "!_regEPKS!" ArchiveDirectory _ArchiveDirectory
+@set _EPKS_MajorRelease=
+@if defined _ArchiveDirectory (
+	set _HistoryRO=!_DirWork!\ServerDataDirectory\_HistoryRO.txt
+	set _ArchiveDirectory=%_ArchiveDirectory:;=" "%
+	for %%h in (!_ArchiveDirectory!) do (
+		dir /s/a:r %%h >NUL 2>&1
+		if [!errorlevel!] EQU [0] (
+			if not exist !_HistoryRO! (
+				call :mkNewDir !_DirWork!\ServerDataDirectory
+				call :InitLog !_HistoryRO!
+			)
+			call :logcmd !_HistoryRO! dir /s/a:r %%h
+		)
+	)
+)
+
+if defined _isServer (
+	call :logitem . fixduplicates -report
+	call :mkNewDir !_DirWork!\ServerRunDirectory
+	call :InitLog "!_DirWork!\ServerRunDirectory\_duplicates.txt"
+	call :doCmd fixduplicates -report "!_DirWork!\ServerRunDirectory\_duplicates.txt"
+	call :isEmpty "!_DirWork!\ServerRunDirectory\_duplicates.txt" _isEmptyFixDuplicates
+	@if defined _DbgOut ( echo. .. **  isEmpty return - _isEmptyFixDuplicates: !_isEmptyFixDuplicates! )
+	if "!_isEmptyFixDuplicates!"=="1" (
+		@if defined _DbgOut ( echo. .. **  delete empty file "!_DirWork!\ServerRunDirectory\_duplicates.txt" )
+		del "!_DirWork!\ServerRunDirectory\_duplicates.txt"
+	)
+)
+
+where fildmp >NUL 2>&1
+if %errorlevel%==0 (
+	call :logitem . Experion GDA Table output
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+    call :doCmd fildmp -DUMP -FILE "!_DirWork!\ServerDataDirectory\_gdatbldump.txt" -FILENUM 5 -RECORDS 1,1001 -FORMAT HEX
+)
+
+call :logItem . list HPSInstall temp folder
+call :mkNewDir  !_DirWork!\ServerSetupDirectory
+call :logCmd !_DirWork!\ServerSetupDirectory\_HPSInstallAppDataLocalTemp.txt dir /-C/S C:\Users\HPSInstall\AppData\Local\Temp
+
+where databld >NUL 2>&1
+if %errorlevel%==0 (
+	call :logItem . export Experion operator settings
+	call :mkNewDir  !_DirWork!\ServerRunDirectory
+	call :doCmd databld -export -def OPERATORS -out "!_DirWork!\ServerRunDirectory\_OPERATORS.xml"
+)
 
 goto :eof
 :endregion ExperionAddData
@@ -1826,13 +1995,17 @@ if %errorlevel% NEQ 0 (
 	call :logitem * MS SQL queries *
 	call :mkNewDir !_DirWork!\MSSQL-Logs
 	call :logitem . select count^(*^) from NON_ERDB_POINTS_PARAMS
-	set _SqlFile=!_DirWork!\MSSQL-Logs\_erdb.p2p.txt
+	set _SqlFile="!_DirWork!\MSSQL-Logs\_erdb.p2p.txt"
 	call :InitLog !_SqlFile!
 	call :DoSqlCmd ps_erdb "select count(*) from NON_ERDB_POINTS_PARAMS"
-	sqlcmd -E -w 10000 -d ps_erdb -Q "select s.StrategyName as NonCEEStrategy, containingStrat.StrategyName +'.'+ strat_cont.StrategyName as ReferencedBlock, CASE WHEN s.StrategyID  & 0x80000000 = 0 THEN 'Project' ELSE 'Monitoring' END 'Avatar' from STRATEGY S inner join NON_ERDB_POINTS_PARAMS N on n.StrategyID = S.StrategyID and n.ReferenceCount > 0 inner join CONNECTION Conn on conn.PassiveParamID = N.ParamID and conn.passivecontrolid = n.strategyid  INNER JOIN STRATEGY strat_cont ON strat_cont.StrategyID = conn.ActiveControlID INNER JOIN RELATIONSHIP rel ON rel.TargetID = strat_cont.StrategyID AND rel.RelationshipID = 3 INNER JOIN STRATEGY containingStrat ON rel.SourceID = containingStrat.StrategyID " >>!_SqlFile!
+	@echo.>>!_SqlFile!
+	call :logLine !_SqlFile!
+	@echo ===== %time% : sqlcmd >>!_SqlFile!
+	call :logLine !_SqlFile!
+	sqlcmd -E -w 10000 -d ps_erdb -Q "select cast(s.StrategyName as varchar(40)) as NonCEEStrategy, cast(containingStrat.StrategyName +'.'+ strat_cont.StrategyName as varchar(40)) as ReferencedBlock, CASE WHEN s.StrategyID  & 0x80000000 = 0 THEN 'Project' ELSE 'Monitoring' END 'Avatar' from STRATEGY S inner join NON_ERDB_POINTS_PARAMS N on n.StrategyID = S.StrategyID and n.ReferenceCount > 0 inner join CONNECTION Conn on conn.PassiveParamID = N.ParamID and conn.passivecontrolid = n.strategyid  INNER JOIN STRATEGY strat_cont ON strat_cont.StrategyID = conn.ActiveControlID INNER JOIN RELATIONSHIP rel ON rel.TargetID = strat_cont.StrategyID AND rel.RelationshipID = 3 INNER JOIN STRATEGY containingStrat ON rel.SourceID = containingStrat.StrategyID " >>!_SqlFile!
 
 	:: SQL Loggins
-	set _SqlFile=!_DirWork!\MSSQL-Logs\_SqlLogins.txt
+	set _SqlFile="!_DirWork!\MSSQL-Logs\_SqlLogins.txt"
 	call :InitLog !_SqlFile!
 	call :logitem . EXEC sp_helplogins
 	call :DoSqlCmd master "EXEC sp_helplogins"
@@ -1844,14 +2017,17 @@ if %errorlevel% NEQ 0 (
 ::emsqueries
 	call :mkNewDir !_DirWork!\MSSQL-Logs
 	call :logitem . emsevents sql queries
-	set _SqlFile=!_DirWork!\MSSQL-Logs\_emsqueries.output.txt
+	set _SqlFile="!_DirWork!\MSSQL-Logs\_emsqueries.output.txt"
 	call :InitLog !_SqlFile!
 	call :DoSqlCmd EMSEvents "SELECT @@VERSION"
-	call :DoSqlCmd EMSEvents "SELECT SERVERPROPERTY('MachineName')"
+	call :DoSqlCmd EMSEvents "SELECT CAST( SERVERPROPERTY('MachineName') as varchar(100)) AS 'MachineName'"
 	call :DoSqlCmd EMSEvents "SELECT @@SERVERNAME"
 	call :DoSqlCmd EMSEvents "SELECT * FROM sys.databases"
 	call :DoSqlCmd EMSEvents "SELECT * FROM sys.assemblies"
+	call :DoSqlCmd EMSEvents "DBCC SQLPERF(LOGSPACE)"
 	call :DoSqlCmd EMSEvents "sp_helpdb EMSEvents"
+	call :DoSqlCmd EMSEvents "sp_spaceused"
+	call :DoSqlCmd EMSEvents "SELECT cast(DB_NAME() as varchar(25)) AS DbName, cast(name as varchar(50)) AS FileName, cast(type_desc as varchar(10)) as type_desc, size/128.0 AS CurrentSizeMB, size/128.0 - CAST(FILEPROPERTY(name, 'SpaceUsed') AS INT)/128.0 AS FreeSpaceMB FROM sys.database_files WHERE type IN (0,1);"
 	call :DoSqlCmd EMSEvents "SELECT * FROM sys.sysobjects ORDER BY [name]"
 	call :DoSqlCmd EMSEvents "SELECT * FROM dbo.EventConfig"
 	call :DoSqlCmd EMSEvents "SELECT * FROM EMSEvents.dbo.KnownArchives"
@@ -1881,7 +2057,7 @@ if %errorlevel% NEQ 0 (
 ::CheckSQLDBLogs
 	call :mkNewDir !_DirWork!\MSSQL-Logs
 	call :logitem . Check SQL DB Logs
-	set _SqlFile=!_DirWork!\MSSQL-Logs\_CheckSQLDBLogs.txt
+	set _SqlFile="!_DirWork!\MSSQL-Logs\_CheckSQLDBLogs.txt"
 	call :InitLog !_SqlFile!
 	call :DoSqlCmd master "select [name] AS 'DBName', CAST(DATABASEPROPERTYEX([name],'recovery') as varchar(25)) AS 'Recovery Model' from master.dbo.SysDatabases"
 	call :DoSqlCmd master "DBCC SQLPERF(LOGSPACE)"
@@ -1890,12 +2066,13 @@ if %errorlevel% NEQ 0 (
 :: SQL Config & Status
 	call :mkNewDir !_DirWork!\MSSQL-Logs
 	call :logitem . SQL Server Status
-	set _SqlFile=!_DirWork!\MSSQL-Logs\_SqlStatus.txt
+	set _SqlFile="!_DirWork!\MSSQL-Logs\_SqlStatus.txt"
 	call :InitLog !_SqlFile!
 	::call :DoSqlCmd master "SELECT * FROM sys.configurations"
 	call :DoSqlCmd master "EXEC sp_configure"
 	call :DoSqlCmd master "select * from sys.dm_os_process_memory"
 	call :DoSqlCmd master "select * FROM sys.dm_os_sys_memory"
+	call :DoSqlCmd msdb   "EXEC msdb.dbo.sp_help_jobhistory"
 
 goto :eof
 :endregion
@@ -2037,7 +2214,7 @@ exit /b 1 -- no cab, end compress
 ::    - The response content cannot be parsed because the Internet Explorer engine is not available, or Internet Explorer's first-launch configuration is not complete. Specify the UseBasicParsing parameter and try again.
 ::  - v1.27 :
 ::    reg query HKLM\SOFTWARE\classes\Hw...
-::    collecting branc hcache status and settings
+::    collecting branch cache status and settings
 ::  - v1.28 : export "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" Events
 ::  - v1.29 fix 'wmic /output:"path"' command
 ::  - v1.30
@@ -2084,3 +2261,21 @@ exit /b 1 -- no cab, end compress
 ::    search for dual*q resident heap file, not only for dual_q
 ::    Reg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
 ::    copy flbkup.def file
+::  - v1.36
+::    restore default command prompt title
+::    get netlogon registry - check for not completed join/unjoin DC action
+::    search read only files in history archives
+::    get SQL jobs history
+::    fixduplicates -report
+::    Experion GDA Table output
+::    omreport storage vdisk controller=0
+::    list HPSInstall temp folder
+::    EMSEvents "sp_spaceused"
+::    export Experion operator settings
+::  - v1.37
+::    omreport verbose output
+::    acronis registry settings
+::    check resident based heap file exist before listitng it
+::    get operator logon scripts
+::    activeMonitorsReg - HKCU\Control Panel\Desktop\PerMonitorSettings
+::    WMI Provider Host Quota Configuration

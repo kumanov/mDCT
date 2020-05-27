@@ -76,6 +76,8 @@ Usage examples:
   - pending reboot check
   - Dism /Online /Cleanup-Image /CheckHealth
   - vssadmin list report
+  - create omreport
+  - get operator logon scripts
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -125,6 +127,7 @@ Usage examples:
   - SQL Loggins
   - NON_ERDB_POINTS_PARAMS
   - SQL Config & Memory Status
+  = get SQL jobs history
 - Experion
   - dsasublist output
   - filfrag output
@@ -149,4 +152,6 @@ Usage examples:
   - get "%HwProgramData%\Experion PKS\Server\data\mapping\*.xml" files
   - plexus -printconfig
   - get Experion flbkup.def file
-  
+  - Experion GDA Table output
+  - list HPSInstall temp folder
+  - export Experion operator settings
