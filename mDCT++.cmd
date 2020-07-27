@@ -3,7 +3,7 @@
 setlocal enableDelayedExpansion
 
 
-set _ScriptVersion=v1.37
+set _ScriptVersion=v1.38
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
@@ -164,7 +164,7 @@ if "%PROCESSOR_ARCHITECTURE%" equ "x86" (
 	if not defined PROCESSOR_ARCHITECTURE6432 ( set _xOS=32 )
 )
 
-set _Comp_Time=%COMPUTERNAME%_%_CurDateTime%
+set _Comp_Time=%COMPUTERNAME%_!_CurDateTime!
 @if defined _DbgOut ( echo. .. **  _Comp_Time: %_Comp_Time% )
 :: set work folder
 set _DirWork=%_DirScript%%_Comp_Time%
@@ -176,13 +176,13 @@ call :mkNewDir !_DirWork!
 :: init LogFile
 if not defined _LogFile set _LogFile=!_DirWork!\mDCTlog.txt
 @if defined _DbgOut ( echo. .. ** _LogFile: !_LogFile! )
-call :InitLog !_LogFile!
+call :InitLog "!_LogFile!"
 
 :: change priority to idle - this & all child commands
 call :logitem change priority to IDLE
 wmic process where name="cmd.exe" CALL setpriority "idle"  >NUL 2>&1
 
-call :WriteHostNoLog blue black *** %_ScriptVersion% Dont click inside the script window while processing as it will cause the script to pause. ***
+call :WriteHostNoLog blue gray *** Dont click inside the script window while processing as it will cause the script to pause. ***
 
 :: VEP detect
 wmic path win32_computersystem get Manufacturer /value | findstr /ic:"VMware" >NUL 2>&1
@@ -268,7 +268,9 @@ goto :eof
 	For /f "skip=1 tokens=1-2 delims=. " %%a in ('wmic os get LocalDateTime') do (set _CurDateTime=%%a&goto :nextline)
 	:nextline
 	For /f "tokens=1-2 delims=/: " %%a in ("%TIME%") do (if %%a LSS 10 (set _CurTime=0%%a%%b) else (set _CurTime=%%a%%b))
-	set _CurDateTime=%_CurDateTime:~0,8%_%_CurDateTime:~8,6%
+	set _CurDateTime=!_CurDateTime:~0,8!_!_CurDateTime:~8,6!
+	rem fix - remove commas, if any
+	set _CurDateTime=!_CurDateTime:,=!
 	@goto :eof
 
 :getLocale	-- UTILITY to get System locale
@@ -362,14 +364,14 @@ goto :eof
 	call :logLine "!_LogFile!"
 	@echo ===== %time% : %* >> "!_LogFile!"
 	call :logLine "!_LogFile!"
-	%* >> %_LogFile% 2>&1
+	%* >> "!_LogFile!" 2>&1
 	@echo. >> "!_LogFile!"
 	call :SleepX 1
 	@goto :eof
 
 :doCmdNoLog  - UTILITY log execution of a command to the current log file
 	call :logLine "!_LogFile!"
-	@echo ===== %time% : %* >> !_LogFile!
+	@echo ===== %time% : %* >> "!_LogFile!"
 	call :logLine "!_LogFile!"
 	%*
 	@echo. >> "!_LogFile!"
@@ -411,6 +413,7 @@ goto :eof
 :mkNewDir
 	SETLOCAL
 	set _NewDir=%*
+	set _NewDir=!_NewDir:"=!!"!
 	if not exist "%_NewDir%" mkdir "%_NewDir%"
 	ENDLOCAL & REM -- RETURN VALUES
 	goto :eof
@@ -503,7 +506,7 @@ EXIT /b
 	set _HMIWebLog=%HwProgramData%\HMIWebLog\
 	@set _stnFiles=!_DirWork!\Station-logs\_stnFiles.txt
 	:: create stn file list
-	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_HMIWebLog! -Include log.txt,hmiweblogY*.txt -Recurse | Select-String -Pattern 'Connecting using .stn file: (.*stn)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file !_stnFiles!  -Encoding unicode}}
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path '!_HMIWebLog!' -Include log.txt,hmiweblogY*.txt -Recurse | Select-String -Pattern 'Connecting using .stn file: (.*stn)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file '!_stnFiles!'  -Encoding unicode}}"
 	:: copy files
 	for /f "tokens=* delims=" %%h in ('type !_stnFiles!') DO (
 		set _stnFile=_%%~nh%%~xh
@@ -514,7 +517,7 @@ EXIT /b
 	
 	:: get stb files
 	@set _stbFiles=%temp%\_stbFiles.txt
-	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_DirWork!\Station-logs\ -Include *.stn -Recurse | Select-String -Pattern 'Toolbar_Settings=(.*stb)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file !_stbFiles!}}
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path '!_DirWork!\Station-logs\' -Include *.stn -Recurse | Select-String -Pattern 'Toolbar_Settings=(.*stb)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file '!_stbFiles!'}}"
 	:: copy files
 	for /f "tokens=* delims=" %%h in ('type !_stbFiles!') DO (
 		set _stbFile=_%%~nh%%~xh
@@ -526,7 +529,7 @@ EXIT /b
 
 	:: get Display Links files
 	@set _dspLinksFiles=%temp%\_stbFiles.txt
-	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path !_DirWork!\Station-logs\ -Include *.stn -Recurse | Select-String -Pattern 'DisplayLinksPath=(.*xml)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file !_dspLinksFiles!}}
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci -Path '!_DirWork!\Station-logs\' -Include *.stn -Recurse | Select-String -Pattern 'DisplayLinksPath=(.*xml)$' | foreach{$_.Matches} | foreach {$_.Groups[1].Value} | sort -Unique | out-file '!_dspLinksFiles!'}}"
 	:: copy files
 	for /f "tokens=* delims=" %%h in ('type !_dspLinksFiles!') DO (
 		set _dspLinksFile=_%%~nh%%~xh
@@ -557,10 +560,10 @@ call :InitLog !_outFile!
 >>!_psFile! echo If ($auxGdiHandles -eq 0) { continue }
 >>!_psFile! echo $auxCountHandles += $auxGdiHandles; $auxDict = @{ PID = $p.Id; GDIHandles = $auxGdiHandles; ProcessName = $p.Name; };
 >>!_psFile! echo $GuiResources += New-Object -TypeName psobject -Property $auxDict; };
->>!_psFile! echo $GuiResources ^| sort GDIHandles -Desc ^| select -First 10 ^| ft -a ^| out-file !_outFile! -Append -Encoding ascii
+>>!_psFile! echo $GuiResources ^| sort GDIHandles -Desc ^| select -First 10 ^| ft -a ^| out-file '!_outFile!' -Append -Encoding ascii
 ::@::>>!_psFile! echo '' ^| out-file !_outFile! -Append -Encoding ascii
->>!_psFile! echo $('{0} processes; {1}/{2} with/without GDI objects' -f $allProcesses.Count, $GuiResources.Count, ($allProcesses.Count - $GuiResources.Count)) ^| out-file !_outFile! -Append -Encoding ascii
->>!_psFile! echo "Total number of GDI handles: $auxCountHandles" ^| out-file !_outFile! -Append -Encoding ascii
+>>!_psFile! echo $('{0} processes; {1}/{2} with/without GDI objects' -f $allProcesses.Count, $GuiResources.Count, ($allProcesses.Count - $GuiResources.Count)) ^| out-file '!_outFile!' -Append -Encoding ascii
+>>!_psFile! echo "Total number of GDI handles: $auxCountHandles" ^| out-file '!_outFile!' -Append -Encoding ascii
 PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass %_psFile%
 @if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at getGDIHandlesCount with PowerShell'. )
 if "%errorlevel%" neq "0" (
@@ -616,8 +619,8 @@ exit /b
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v VisualFXSetting
 			:: R5xx - Setting Windows ColorPrelevance (making active window title bar to change its color)
 			call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Windows\DWM" /v ColorPrevalence
-			if NOT "_VEP"=="1" (
-				if NOT "_isServer"=="1" (
+			if NOT "!_VEP!"=="1" (
+				if NOT "!_isServer!"=="1" (
 					call :GetReg QUERY "HKEY_USERS\!_SID!\Software\Microsoft\Avalon.Graphics" /v DisableHWAcceleration
 				)
 			)
@@ -664,25 +667,25 @@ exit /b
 	call :logitem . Experion ACL Verify
 	
 	call :logOnlyItem . Experion ACL Verify - HKLM:\SOFTWARE\Honeywell\
-	@echo.>>!_AclVerify! 
+	@echo.>>!_AclVerify!
 	call :logLine !_AclVerify!
 	@echo ===== !time! : Get-Acl HKLM:\SOFTWARE\Honeywell\ >>!_AclVerify!
 	call :logLine !_AclVerify!
-	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
+	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file '!_AclVerify!' -Append -Encoding ascii }}"
 	
 	call :logOnlyItem . Experion ACL Verify - HKLM:\SOFTWARE\Wow6432Node\Honeywell\
 	@echo.>>!_AclVerify!
 	call :logLine !_AclVerify!
 	@echo ===== !time! : Get-Acl HKLM:\SOFTWARE\Wow6432Node\Honeywell\ >>!_AclVerify!
 	call :logLine !_AclVerify!
-	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Wow6432Node\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file !_AclVerify! -Append -Encoding ascii }}
+	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-ChildItem -Path HKLM:\SOFTWARE\Wow6432Node\Honeywell\ -Recurse -ea 0 | ForEach-Object {Get-Acl $_.PSPath -ea 0} | Where-Object { -not $_.AreAccessRulesCanonical} | out-file '!_AclVerify!' -Append -Encoding ascii }}"
 
 	call :logOnlyItem . Experion ACL Verify - "%HwProgramData%\Experion PKS"
 	@echo.>>!_AclVerify!
 	call :LogCmd !_AclVerify! ICACLS "%HwProgramData%\Experion PKS" /verify /T /C /L /Q
 	
 	call :logOnlyItem . Experion ACL Verify - "%HwInstallPath%\Experion PKS"
-	@echo.>>!_AclVerify! 
+	@echo.>>!_AclVerify!
 	call :logLine !_AclVerify!
 	@echo ===== !time! : ICACLS "%HwInstallPath%\Experion PKS" /verify /T /C /L /Q >>!_AclVerify!
 	call :logLine !_AclVerify!
@@ -690,7 +693,7 @@ exit /b
 	if not exist "%HwInstallPath%\Experion PKS\User Assistance" (
 		ICACLS "%HwInstallPath%\Experion PKS" /verify /T /C /L /Q >>!_AclVerify!
 	)
-	@echo.>>!_AclVerify! 
+	@echo.>>!_AclVerify!
 	
 	(ENDLOCAL & REM -- RETURN VALUES
 	)
@@ -843,7 +846,7 @@ exit /b
 	) else (
 		set "_evtxFile=!_folder!"
 	)
-	:: set events limit
+	:: set events date/time limit
 	for /f "usebackq delims=" %%h in (`PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { (Get-Date).AddDays(-60).toString('s')+'Z' }}"`) do set "_TimeLimit=%%h"
 	:: export events
 	wevtutil epl "%_Channel%" "%_evtxFile%" "/q:*[System[TimeCreated[@SystemTime>='!_TimeLimit!']]]" /overwrite:true
@@ -905,8 +908,8 @@ call :LogCmd !_DirWork!\GeneralSystemInfo\firewall.txt netsh firewall show confi
 call :logitem get time zone information
 call :getTimeZoneInfo _tzName _tzBias
 call :InitLog !_DirWork!\GeneralSystemInfo\timezone.output.txt
-@echo TimeZone Name: %_tzName% >>!_DirWork!\GeneralSystemInfo\timezone.output.txt
-@echo TimeZone Bias: %_tzBias% >>!_DirWork!\GeneralSystemInfo\timezone.output.txt
+@echo TimeZone Name: %_tzName% >>"!_DirWork!\GeneralSystemInfo\timezone.output.txt"
+@echo TimeZone Bias: %_tzBias% >>"!_DirWork!\GeneralSystemInfo\timezone.output.txt"
 call :SleepX 1
 
 (call :logitem export Windows Events
@@ -928,9 +931,18 @@ call :SleepX 1
 call :logitem export Experion registry settings
 call :mkNewDir  "!_DirWork!\RegistryInfo"
 if exist %windir%\SysWOW64\regedit.exe (set _regedit="%windir%\SysWOW64\regedit.exe") else (set _regedit=regedit.exe)
-call :doCmd !_regedit! /E "!_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt" "HKEY_CURRENT_USER\Software\Honeywell"
-call :doCmd !_regedit! /E "!_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt" "HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell"
-call :doCmd !_regedit! /E "!_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Microsoft_Uninstall.txt" "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+:: HKEY_CURRENT_USER\Software\Honeywell
+set _RegFileOut=!_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt
+call :doCmd !_regedit! /E "!_RegFileOut!" "HKEY_CURRENT_USER\Software\Honeywell"
+if not exist "!_RegFileOut!" (call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore" "!_RegFileOut!")
+::HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell
+set _RegFileOut=!_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt
+call :doCmd !_regedit! /E "!_RegFileOut!" "HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell"
+if not exist "!_RegFileOut!" (call :doCmd REG EXPORT "HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell" "!_RegFileOut!")
+::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall
+set _RegFileOut=!_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Microsoft_Uninstall.txt
+call :doCmd !_regedit! /E "!_RegFileOut!" "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+if not exist "!_RegFileOut!" (call :doCmd REG EXPORT "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" "!_RegFileOut!")
 
 
 call :logitem get FTE logs
@@ -1123,6 +1135,7 @@ if %errorlevel%==0 (
 	call :InitLog !_DirWork!\ServerRunDirectory\hwlictool.output.txt
     call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool export -format:xml
     call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool status -format:xml
+    call :logCmd !_DirWork!\ServerRunDirectory\hwlictool.output.txt hwlictool list
 )
 where usrlrn >NUL 2>&1
 if %errorlevel%==0 (
@@ -1155,6 +1168,12 @@ call :mkNewDir !_DirWork!\ErrorHandling
 call :doCmd copy /y "%HwProgramData%\Experion PKS\BrowserLog_Current.txt" "!_DirWork!\ErrorHandling\"
 call :doCmd copy /y "%HwProgramData%\Experion PKS\CurrentLogIndex.txt" "!_DirWork!\ErrorHandling\"
 call :doCmd copy /y "%HwProgramData%\Experion PKS\ErrLog_*.txt" "!_DirWork!\ErrorHandling\"
+
+:: get CreateSQLObject logs
+call :logitem get CreateSQLObject logs
+call :mkNewDir !_DirWork!\CreateSQL-Logs
+call :doCmd copy /y "%HwProgramData%\\Experion PKS\Server\data\CreateSQLObject*.txt" "!_DirWork!\CreateSQL-Logs\"
+
 
 goto :eof
 :endregion
@@ -1208,6 +1227,7 @@ call :DoNltestDomInfo
 call :logitem . get power configuration settings
 set _powerCfgFile="!_DirWork!\GeneralSystemInfo\_powercfg.txt"
 call :InitLog !_powerCfgFile!
+call :LogCmd !_powerCfgFile! powercfg -list
 call :LogCmd !_powerCfgFile! powercfg -Q
 :: reg query power settings
 call :logOnlyItem . reg query power settings
@@ -1254,9 +1274,9 @@ call :doCmd copy /y "%windir%\WindowsUpdate.log" "!_DirWork!\GeneralSystemInfo\_
 :WmiConfiguration
 call :logitem . WMI Configuration
 ::WmiRootSecurityDescriptor
-call :LogWmicCmd "!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt" wmic /namespace:\\root path __systemsecurity call GetSecurityDescriptor
+call :LogWmicCmd !_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt wmic /namespace:\\root path __systemsecurity call GetSecurityDescriptor
 :: WMI Provider Host Quota Configuration
-call :LogWmicCmd "!_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt" wmic /namespace:\\root path __ProviderHostQuotaConfiguration
+call :LogWmicCmd !_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt wmic /namespace:\\root path __ProviderHostQuotaConfiguration
 
 :: McAfee on accesss scanner settings
 reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
@@ -1280,7 +1300,7 @@ if %ERRORLEVEL% EQU 0 (
 call :logOnlyItem . secedit /export /cfg
 set _SecurityFile=!_DirWork!\GeneralSystemInfo\_SecurityCfg.txt
 call :InitLog !_SecurityFile!
-secedit /export /cfg !_SecurityFile! >> !_LogFile!
+secedit /export /cfg !_SecurityFile! >> "!_LogFile!"
 call :SleepX 1
 
 ::call :logOnlyItem . query drivers information
@@ -1290,8 +1310,12 @@ call :logItem . reg query RPC settings
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile="!_DirWork!\RegistryInfo\_RPC_registry_settings.txt"
 call :InitLog !_RegFile!
-call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\RPC" /s
 call :GetReg QUERY "HKLM\Software\Microsoft\Rpc" /s
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\RpcEptMapper" /s
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\RpcLocator" /s
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\RpcSs" /s
+call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows NT\Rpc" /s
+
 
 call :logItem . reg query Microsoft\OLE
 call :mkNewDir  !_DirWork!\RegistryInfo
@@ -1307,10 +1331,16 @@ call :GetReg QUERY  "HKCU\Control Panel\Desktop" /t REG_SZ,REG_MULTI_SZ,REG_EXPA
 call :GetReg QUERY  "HKCU\Control Panel\Desktop\PerMonitorSettings" /s
 call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
 
+call :logOnlyItem . reg query services
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile="!_DirWork!\RegistryInfo\_HKLM_Services.txt"
+call :InitLog !_RegFile!
+call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+
 @if defined _DbgOut ( echo. .. ** reg query misc)
 call :logOnlyItem . reg query misc
 call :mkNewDir  !_DirWork!\RegistryInfo
-set _RegFile=!_DirWork!\RegistryInfo\_reg_query_misc.txt
+set _RegFile="!_DirWork!\RegistryInfo\_reg_query_misc.txt"
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows" /v CEIPEnable
 call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
@@ -1329,6 +1359,7 @@ reg query "HKLM\SOFTWARE\Acronis" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
 call :GetReg QUERY "HKLM\SOFTWARE\Acronis"
 )
+call :GetReg QUERY "HKCU\SOFTWARE\Microsoft\Internet Explorer\Main" /v UseSWRender
 
 @if defined _DbgOut ( echo. .. ** Windows Time status/settings)
 call :logItem . Windows Time status/settings
@@ -1341,8 +1372,8 @@ set _RegFile=!_WindowsTimeFile!
 call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s  /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 
 :: temperature
-@if defined _DbgOut ( echo. .. ** _VEP=%_VEP%)
-if not "%_VEP%"=="1" (
+@if defined _DbgOut ( echo. .. ** _VEP=!_VEP!)
+if not "!_VEP!"=="1" (
 	wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature 2>NUL | find/i "CurrentTemperature" >NUL 2>&1
 	if !errorlevel!==0 (
 		call :logItem . get Windows Thermal Zone Temperature information
@@ -1376,7 +1407,7 @@ call :LogCmd !_localgroups! net localgroup "Local View Only Users"
 call :LogCmd !_localgroups! net localgroup "Distributed COM Users"
 
 call :logitem . get HKEY_USERS Reg Values
-set _RegFile=!_DirWork!\RegistryInfo\_HKEY_USERS.txt
+set _RegFile="!_DirWork!\RegistryInfo\_HKEY_USERS.txt"
 call :mkNewDir !_DirWork!\RegistryInfo
 if exist !_RegFile! call :doit del "!_RegFile!"
 call :GetHkeyUsersRegValues
@@ -1391,14 +1422,15 @@ call :LogCmd !_mngrUserAccount! net user mngr
 call :logitem . MiniFilter drivers
 set _fltmc=!_DirWork!\GeneralSystemInfo\_fltmc.output.txt
 call :InitLog !_fltmc!
-call :LogCmd !_fltmc! FLTMC
-call :LogCmd !_fltmc! fltmc instances
+call :LogCmd !_fltmc! FLTMC Filters
+call :LogCmd !_fltmc! fltmc Instances
+call :LogCmd !_fltmc! fltmc Volumes
 
 :: Experion ACL Verify
 call :ExperionAclVerify
 
 :: diskdrive status
-if not "%_VEP%"=="1" (
+if not "!_VEP!"=="1" (
 	call :logitem . diskdrive status
 	call :mkNewDir  !_DirWork!\GeneralSystemInfo
 	set _diskdrive=!_DirWork!\GeneralSystemInfo\_diskdrive.txt
@@ -1436,8 +1468,8 @@ if !_OSVER3! GEQ 9200 ( call :logitem . fetching Branchcache infos using PowerSh
 call :logCmd !_BranchcacheFile! bitsadmin /list /AllUsers /verbose
 call :logCmd !_BranchcacheFile! bitsadmin /util /version /verbose
 call :logCmd !_BranchcacheFile! bitsadmin /PEERS /LIST
-call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistpub 
-call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistRepub 
+call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistpub
+call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkService\AppData\Local\PeerDistRepub
 
 
 :: additional Windows Event Logs
@@ -1445,15 +1477,20 @@ call :logitem . export additional Windows Event Logs
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :export-evtx Microsoft-Windows-TerminalServices-LocalSessionManager/Operational !_DirWork!\GeneralSystemInfo\
 call :export-evtx Microsoft-Windows-TaskScheduler/Operational !_DirWork!\GeneralSystemInfo\
+call :export-evtx "Microsoft-Windows-Windows Firewall With Advanced Security/Firewall" !_DirWork!\GeneralSystemInfo\
+:: System & Application event logs (errors & warnings) to csv
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {Get-WinEvent -LogName System -FilterXPath '*[System[(Level=1  or Level=2 or Level=3)]]' | select -Property TimeCreated,Id,LevelDisplayName,ProviderName,Message | Export-Csv '!_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.csv' -NoTypeInformation}"
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {Get-WinEvent -LogName Application -FilterXPath '*[System[(Level=1  or Level=2 or Level=3)]]' | select -Property TimeCreated,Id,LevelDisplayName,ProviderName,Message | Export-Csv '!_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Application.csv' -NoTypeInformation}"
+
+
 
 :: MSPower_DeviceEnable
 call :logItem . MSPower_DeviceEnable query
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
-set _MSPower_DeviceEnable="!_DirWork!\GeneralSystemInfo\_MSPower_DeviceEnable.txt"
+set _MSPower_DeviceEnable=!_DirWork!\GeneralSystemInfo\_MSPower_DeviceEnable.txt
 call :InitLog !_MSPower_DeviceEnable!
 @echo.>>!_MSPower_DeviceEnable!
 call :LogWmicCmd !_MSPower_DeviceEnable! wmic /namespace:\\root\wmi PATH MSPower_DeviceEnable get Active,Enable,InstanceName
-
 
 :region PendingRebot
 call :logitem . check pending reboot
@@ -1480,12 +1517,14 @@ WMIC.EXE /NAMESPACE:\\root\ccm\clientsdk PATH CCM_ClientUtilities call Determine
 :endregion PendingRebot
 
 :: DISM Check Health
-call :logItem . DISM Check Health
-Dism /Online /Cleanup-Image /CheckHealth | find /i "No component store corruption detected" >NUL 2>&1
-if /i "%errorlevel%" NEQ "0" (
-	call :mkNewDir  !_DirWork!\GeneralSystemInfo
-	call :InitLog !_DirWork!\GeneralSystemInfo\_DISM_CheckHealth.txt
-	call :logCmd !_DirWork!\GeneralSystemInfo\_DISM_CheckHealth.txt Dism /Online /Cleanup-Image /CheckHealth
+if "%_OSVER1%" GTR "6" (
+	call :logItem . DISM Check Health
+	Dism /Online /Cleanup-Image /CheckHealth | find /i "No component store corruption detected" >NUL 2>&1
+	if /i "%errorlevel%" NEQ "0" (
+		call :mkNewDir  !_DirWork!\GeneralSystemInfo
+		call :InitLog !_DirWork!\GeneralSystemInfo\_DISM_CheckHealth.txt
+		call :logCmd !_DirWork!\GeneralSystemInfo\_DISM_CheckHealth.txt Dism /Online /Cleanup-Image /CheckHealth
+	)
 )
 
 :: vssadmin list report
@@ -1502,26 +1541,41 @@ call :logCmd !_VssAdminListReport! vssadmin List Writers
 :: omreport
 where omreport >NUL 2>&1
 if %errorlevel%==0 (
-	call :logitem . omreport storage vdisk controller=0
+	call :logitem . omreport info
 	call :mkNewDir !_DirWork!\GeneralSystemInfo
 	call :InitLog !_DirWork!\GeneralSystemInfo\_omreport.txt
-	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system alertlog
-	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system esmlog
-	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system cmdlog
+	
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport  about details=true
 	
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system operatingsystem
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system summary
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system version
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system thrmshutdown
+	
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system alertaction
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system alertlog
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system esmlog
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system cmdlog
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport system postlog
+	
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis info
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis firmware
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis leds
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis bios
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis biossetup
 
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis pwrmonitoring
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis pwrmanagement
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis pwrsupplies
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis acswitch
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis fans
+	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis fancontrol
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis memory
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis nics
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis processors
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis temps
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis volts
+	rem This command is no longer available through Server Administrator!!   call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis currents
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport chassis batteries
 	
 	call :logCmd !_DirWork!\GeneralSystemInfo\_omreport.txt omreport storage pdisk controller=0
@@ -1541,14 +1595,37 @@ if defined _domainScripts (
 	call :doCmd copy /y %windir%\SYSVOL\domain\scripts\*.bat "!_DirWork!\GeneralSystemInfo\_scripts\"
 	call :doCmd copy /y %windir%\SYSVOL\domain\scripts\*.cmd "!_DirWork!\GeneralSystemInfo\_scripts\"
 )
-if exist %windir%\System32\repl\import\scripts\\*.bat set _replImportScripts=1
-if exist %windir%\System32\repl\import\scripts\\*.cmd set _replImportScripts=1
+if exist %windir%\System32\repl\import\scripts\*.bat set _replImportScripts=1
+if exist %windir%\System32\repl\import\scripts\*.cmd set _replImportScripts=1
 if defined _replImportScripts (
 	call :logOnlyItem operator logon scripts - %windir%\System32\repl\import\scripts\
 	call :mkNewDir  !_DirWork!\GeneralSystemInfo\_scripts
 	call :doCmd copy /y %windir%\System32\repl\import\scripts\*.bat "!_DirWork!\GeneralSystemInfo\_scripts\"
 	call :doCmd copy /y %windir%\System32\repl\import\scripts\*.cmd "!_DirWork!\GeneralSystemInfo\_scripts\"
 )
+
+:: hdd defrag analysis
+if NOT "!_VEP!"=="1" (
+	call :logItem . hdd defrag analysis
+	call :mkNewDir  !_DirWork!\GeneralSystemInfo
+	set _defrag_analysis="!_DirWork!\GeneralSystemInfo\_defrag.analysis.txt"
+	call :InitLog !_defrag_analysis!
+	call :logCmd !_defrag_analysis! defrag /c /a /v
+)
+
+call :logOnlyItem . reg query HKCU\Control Panel
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile="!_DirWork!\RegistryInfo\_HKCU_Control_Panel.txt"
+call :InitLog !_RegFile!
+call :GetReg QUERY  "HKCU\Control Panel" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+
+call :logOnlyItem . reg query Internet Settings
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile="!_DirWork!\RegistryInfo\_InternetSettings.txt"
+call :InitLog !_RegFile!
+call :GetReg QUERY "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg QUERY "HKEY_USERS\S-1-5-18\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /s
+call :GetReg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings" /s
 
 
 :: next
@@ -1578,13 +1655,14 @@ call :LogCmd !_DirWork!\_Network\ipconfig.displaydns.txt ipconfig /displaydns
 call :logitem . netsh config/stats
 set _NetShFile=!_DirWork!\_Network\netsh.output.txt
 call :InitLog !_NetShFile!
-call :LogCmd !_NetShFile! netsh int ipv4 show dynamicport tcp
 call :LogCmd !_NetShFile! netsh int tcp show global
+call :LogCmd !_NetShFile! netsh int IP show config
+call :LogCmd !_NetShFile! netsh int ipv4 show dynamicport tcp
 call :LogCmd !_NetShFile! netsh int ipv4 show offload
-call :LogCmd !_NetShFile! netsh interface IP show config
-call :LogCmd !_NetShFile! netsh interface ipv4 show ipstats
-call :LogCmd !_NetShFile! netsh interface ipv4 show udpstats
-call :LogCmd !_NetShFile! netsh interface ipv4 show tcpstats
+call :LogCmd !_NetShFile! netsh int ipv4 show addresses
+call :LogCmd !_NetShFile! netsh int ipv4 show ipstats
+call :LogCmd !_NetShFile! netsh int ipv4 show udpstats
+call :LogCmd !_NetShFile! netsh int ipv4 show tcpstats
 call :LogCmd !_NetShFile! netsh http show urlacl
 call :LogCmd !_NetShFile! netsh http show servicestate
 
@@ -1592,21 +1670,21 @@ call :LogCmd !_NetShFile! netsh http show servicestate
 call :logitem . nslookup
 call :SleepX 1
 :: NS LookUp - Forward
-echo ======================================== > !_DirWork!\_Network\nslookup.txt
-echo %date% %time% >> !_DirWork!\_Network\nslookup.txt
-echo cmd: nslookup %computername% >> !_DirWork!\_Network\nslookup.txt
-nslookup %computername% >> !_DirWork!\_Network\nslookup.txt  2>>&1
+echo ======================================== > "!_DirWork!\_Network\nslookup.txt"
+echo %date% %time% >> "!_DirWork!\_Network\nslookup.txt"
+echo cmd: nslookup %computername% >> "!_DirWork!\_Network\nslookup.txt"
+nslookup %computername% >> "!_DirWork!\_Network\nslookup.txt"  2>>&1
 :: NS LookUp - Reverse
 set ip_address_string="IPv4 Address"
 for /f "usebackq tokens=2 delims=:" %%f in (`ipconfig ^| findstr /c:%ip_address_string%`) do (
-	echo ======================================== >> !_DirWork!\_Network\nslookup.txt
-	echo %date% %time% >> !_DirWork!\_Network\nslookup.txt
-    echo Your IP Address is: %%f  >> !_DirWork!\_Network\nslookup.txt
-	echo cmd: nslookup %%f >> !_DirWork!\_Network\nslookup.txt
-	nslookup %%f >> !_DirWork!\_Network\nslookup.txt  2>>&1
+	echo ======================================== >> "!_DirWork!\_Network\nslookup.txt"
+	echo %date% %time% >> "!_DirWork!\_Network\nslookup.txt"
+    echo Your IP Address is: %%f  >> "!_DirWork!\_Network\nslookup.txt"
+	echo cmd: nslookup %%f >> "!_DirWork!\_Network\nslookup.txt"
+	nslookup %%f >> "!_DirWork!\_Network\nslookup.txt"  2>>&1
 )
-echo ======================================== >> !_DirWork!\_Network\nslookup.txt
-echo %date% %time% - done>> !_DirWork!\_Network\nslookup.txt
+echo ======================================== >> "!_DirWork!\_Network\nslookup.txt"
+echo %date% %time% - done>> "!_DirWork!\_Network\nslookup.txt"
 
 call :logitem . route / arp
 call :InitLog !_DirWork!\_Network\arp.txt
@@ -1614,9 +1692,10 @@ call :LogCmd !_DirWork!\_Network\arp.txt  arp -a -v
 call :InitLog !_DirWork!\_Network\route.print.txt
 call :LogCmd !_DirWork!\_Network\route.print.txt route print
 
-call :logitem . nbtstat-n
+call :logitem . nbtstat
 call :InitLog !_DirWork!\_Network\nbtstat.txt
 call :LogCmd !_DirWork!\_Network\nbtstat.txt  nbtstat -n
+call :LogCmd !_DirWork!\_Network\nbtstat.txt  nbtstat -c
 
 :advfirewall
 call :logitem . firewall rules
@@ -1638,8 +1717,9 @@ call :LogCmd !_NetCmdFile! NET LOCALGROUP
 call :LogCmd !_NetCmdFile! NET CONFIG WKSTA
 call :LogCmd !_NetCmdFile! NET STATISTICS Workstation
 call :LogCmd !_NetCmdFile! NET STATISTICS SERVER
+call :LogCmd !_NetCmdFile! NET CONFIG RDR
 
-set _RegFile=!_DirWork!\_Network\TcpIpParameters.txt
+set _RegFile="!_DirWork!\_Network\TcpIpParameters.txt"
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Services\FTEMUXMP" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /v ArpRetryCount
@@ -1685,8 +1765,8 @@ for /f "usebackq skip=1" %%h in (`wmic service where "name='NetTcpPortSharing'" 
 
 call :logitem . get clientaccesspolicy.xml for Silverlight
 call :mkNewDir  "!_DirWork!\_Network"
-::PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml -UseBasicParsing).Content} catch{$_.Exception.Message}) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
-PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(New-Object System.Net.WebClient).DownloadString('http://localhost/clientaccesspolicy.xml')} catch{$_.Exception.Message} ) | out-file !_DirWork!\_Network\clientaccesspolicy.xml }"
+::PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(Invoke-WebRequest -Uri http://localhost/clientaccesspolicy.xml -UseBasicParsing).Content} catch{$_.Exception.Message}) | out-file '!_DirWork!\_Network\clientaccesspolicy.xml' }"
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {@(try{(New-Object System.Net.WebClient).DownloadString('http://localhost/clientaccesspolicy.xml')} catch{$_.Exception.Message} ) | out-file '!_DirWork!\_Network\clientaccesspolicy.xml' }"
 call :SleepX 1
 
 
@@ -1749,8 +1829,12 @@ if defined _isServer (
 	if %errorlevel%==0 (
 		call :logitem . lisscn output
 		call :mkNewDir !_DirWork!\ServerDataDirectory
-		call :doCmd lisscn -all_ref -OUT "!_DirWork!\ServerDataDirectory\_lisscn_all.txt"
-		call :doCmd lisscn -OUT "!_DirWork!\ServerDataDirectory\_lisscn.txt"
+		for /f "tokens=2 delims= " %%h in ('hdwbckbld ^| find /i "DEF CHN"') do (
+			@set _CHN=%%h
+			@set /a _CHN=!_CHN:CHN=!
+			call :logcmd "!_DirWork!\ServerDataDirectory\_lisscn.txt" lisscn -CHN !_CHN!
+			call :logcmd "!_DirWork!\ServerDataDirectory\_lisscn_all.txt" lisscn -CHN !_CHN! -all_ref
+		)
 	)
 
 	where dsasublist >NUL 2>&1
@@ -1764,7 +1848,7 @@ if defined _isServer (
 
 
 call :logitem . crash control registry settings
-set _RegFile=!_DirWork!\CrashDumps\_RegCrashControl.txt
+set _RegFile="!_DirWork!\CrashDumps\_RegCrashControl.txt"
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\CrashControl" /s
 call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug" /s
@@ -1878,7 +1962,7 @@ if %errorlevel%==0 (
 if defined _isServer (
 	call :logOnlyItem . reg query HKEY_LOCAL_MACHINE\SOFTWARE\classes\Hw...
 	call :mkNewDir  !_DirWork!\RegistryInfo
-	set _RegFile=!_DirWork!\RegistryInfo\_HKLM_SOFTWARE_Classes_Experion.txt
+	set _RegFile="!_DirWork!\RegistryInfo\_HKLM_SOFTWARE_Classes_Experion.txt"
 	call :InitLog !_RegFile!
 	call :GetReg QUERY "HKLM\SOFTWARE\classes\HwHsc.OPCServer" /s
 	call :GetReg QUERY "HKLM\SOFTWARE\classes\HwHsc.OPCServer2" /s
@@ -2223,7 +2307,7 @@ exit /b 1 -- no cab, end compress
 ::    get FTE config files - FTEinstall.inf & fteconfig.inf
 ::    get Display Links file - [TouchPanel] section in stn file
 ::    wmic query MSPower_DeviceEnable
-::    get ErrorHandling log files 
+::    get ErrorHandling log files
 ::    check files in Abstract folder for Zone.Identifier stream data
 ::    function :export-evtx
 ::    get system station configuration files
@@ -2279,3 +2363,16 @@ exit /b 1 -- no cab, end compress
 ::    get operator logon scripts
 ::    activeMonitorsReg - HKCU\Control Panel\Desktop\PerMonitorSettings
 ::    WMI Provider Host Quota Configuration
+::  - v1.38
+::    hdd defrag analysis
+::    fixed VEP check: if NOT "!_VEP!"=="1"
+::    reg query HKCU\Control Panel
+::    reg query services
+::    output paths fixes - special cases/chars
+::    regedit export check and fix (EPKS reg export)
+::    reg query Internet Settings
+::    Reg QUERY "HKCU\SOFTWARE\Microsoft\Internet Explorer\Main" /v UseSWRender
+::    added "hwlictool list"
+::    lisscn by channel
+::    System & Application event logs (errors & warnings) to csv
+::    get CreateSQLObject logs

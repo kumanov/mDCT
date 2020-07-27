@@ -78,6 +78,9 @@ Usage examples:
   - vssadmin list report
   - create omreport
   - get operator logon scripts
+  - hdd defrag analysis
+  - reg query HKCU\Control Panel
+  - reg query services
 - Network information
   - netstat -nato
   - ipconfig /displaydns
