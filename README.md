@@ -87,6 +87,7 @@ Usage examples:
   - netsh config/stats
     - netsh int ipv4 show dynamicport tcp
     - netsh int tcp show global
+    - netsh int tcp show heuristics
     - netsh int ipv4 show offload
     - netsh interface IP show config
     - netsh interface ipv4 show ipstats

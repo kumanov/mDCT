@@ -3,7 +3,7 @@
 setlocal enableDelayedExpansion
 
 
-set _ScriptVersion=v1.38
+set _ScriptVersion=v1.40
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
@@ -981,18 +981,52 @@ if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 	call :logitem get Experion log files
 	call :doCmd xcopy /i/q/y/H "%HwProgramData%\Experion PKS\logfiles\log*.txt" "!_DirWork!\SloggerLogs\"
 	:: copy server log archives
-	if exist "%HwProgramData%\Experion PKS\logfiles\00-Server\" (
+	set _LogArchiveDirectory=%HwProgramData%\Experion PKS\logfiles\00-Server\
+	if exist "!_LogArchiveDirectory!" (
 		call :logOnlyitem get Experion Server backup log files
+		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
-		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\logfiles\00-Server\' -filt logServerY*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt log*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
+		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
+	)
+	:: copy CDA log archives
+	set _LogArchiveDirectory=%HwProgramData%\Experion PKS\logfiles\09-CDA\
+	if exist "!_LogArchiveDirectory!" (
+		call :logOnlyitem get CDA backup log files
+		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
+		call :mkNewDir !_DirWork!\SloggerLogs\Archives
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt log*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
 		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
 	:: copy SR log archives
-	if exist "%HwProgramData%\Experion PKS\logfiles\11-SysRep\" (
+	set _LogArchiveDirectory=%HwProgramData%\Experion PKS\logfiles\11-SysRep\
+	if exist "!_LogArchiveDirectory!" (
 		call :logOnlyitem get SR backup log files
+		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
-		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\logfiles\11-SysRep\' -filt logSRY*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt logS*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
+		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
+	)
+	:: copy Activity log archives
+	set _LogArchiveDirectory=%HwProgramData%\Experion PKS\logfiles\12-Activity\
+	if exist "!_LogArchiveDirectory!" (
+		call :logOnlyitem get Activity backup log files
+		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
+		call :mkNewDir !_DirWork!\SloggerLogs\Archives
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt log*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
+		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
+	)
+	:: copy EnggTools log archives
+	set _LogArchiveDirectory=%HwProgramData%\Experion PKS\logfiles\25-EnggTools\
+	if exist "!_LogArchiveDirectory!" (
+		call :logOnlyitem get EnggTools backup log files
+		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
+		call :mkNewDir !_DirWork!\SloggerLogs\Archives
+		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt log*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
 		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
@@ -1173,6 +1207,15 @@ call :doCmd copy /y "%HwProgramData%\Experion PKS\ErrLog_*.txt" "!_DirWork!\Erro
 call :logitem get CreateSQLObject logs
 call :mkNewDir !_DirWork!\CreateSQL-Logs
 call :doCmd copy /y "%HwProgramData%\\Experion PKS\Server\data\CreateSQLObject*.txt" "!_DirWork!\CreateSQL-Logs\"
+
+:: get SQL errorlog files
+where sqlcmd >NUL 2>&1
+if %errorlevel% EQU 0 (
+	call :logitem get SQL Error log files
+	call :mkNewDir !_DirWork!\MSSQL-Logs
+	FOR /F "usebackq tokens=2 delims='" %%h IN (`sqlcmd -E -w 10000 -d master -Q "xp_readerrorlog 0, 1, N'Logging SQL Server messages in file'" ^| find /i "Logging SQL Server messages in file"`) Do  ( @set _SqlLogFile=%%h)
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_SqlLogFile!*' | foreach{copy $_.fullName -dest '!_DirWork!\MSSQL-Logs\'; sleep -Milliseconds 250} }}
+)
 
 
 goto :eof
@@ -1360,6 +1403,8 @@ if %ERRORLEVEL% EQU 0 (
 call :GetReg QUERY "HKLM\SOFTWARE\Acronis"
 )
 call :GetReg QUERY "HKCU\SOFTWARE\Microsoft\Internet Explorer\Main" /v UseSWRender
+:: security-enhanced channel protocols
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /s
 
 @if defined _DbgOut ( echo. .. ** Windows Time status/settings)
 call :logItem . Windows Time status/settings
@@ -1656,6 +1701,7 @@ call :logitem . netsh config/stats
 set _NetShFile=!_DirWork!\_Network\netsh.output.txt
 call :InitLog !_NetShFile!
 call :LogCmd !_NetShFile! netsh int tcp show global
+call :LogCmd !_NetShFile! netsh int tcp show heuristics
 call :LogCmd !_NetShFile! netsh int IP show config
 call :LogCmd !_NetShFile! netsh int ipv4 show dynamicport tcp
 call :LogCmd !_NetShFile! netsh int ipv4 show offload
@@ -2024,6 +2070,7 @@ call :GetRegValue "!_regEPKS!" ArchiveDirectory _ArchiveDirectory
 	set _HistoryRO=!_DirWork!\ServerDataDirectory\_HistoryRO.txt
 	set _ArchiveDirectory=%_ArchiveDirectory:;=" "%
 	for %%h in (!_ArchiveDirectory!) do (
+		call :logOnlyItem . search read only files in %%h
 		dir /s/a:r %%h >NUL 2>&1
 		if [!errorlevel!] EQU [0] (
 			if not exist !_HistoryRO! (
@@ -2376,3 +2423,11 @@ exit /b 1 -- no cab, end compress
 ::    lisscn by channel
 ::    System & Application event logs (errors & warnings) to csv
 ::    get CreateSQLObject logs
+::  - v1.39
+::    Reg QUERY "HKLM\System\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /s
+::    copy CDA log archives
+::    copy Activity log archives
+::    copy EnggTools log archives
+::    get SQL Error log files
+::  - v1.40
+::    netsh int tcp show heuristics
