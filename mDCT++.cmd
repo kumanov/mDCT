@@ -934,7 +934,7 @@ if exist %windir%\SysWOW64\regedit.exe (set _regedit="%windir%\SysWOW64\regedit.
 :: HKEY_CURRENT_USER\Software\Honeywell
 set _RegFileOut=!_DirWork!\RegistryInfo\HKEY_CURRENT_USER_Software_Honeywell.txt
 call :doCmd !_regedit! /E "!_RegFileOut!" "HKEY_CURRENT_USER\Software\Honeywell"
-if not exist "!_RegFileOut!" (call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore" "!_RegFileOut!")
+if not exist "!_RegFileOut!" (call :doCmd REG EXPORT "HKEY_CURRENT_USER\Software\Honeywell" "!_RegFileOut!")
 ::HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell
 set _RegFileOut=!_DirWork!\RegistryInfo\HKEY_LOCAL_MACHINE_Software_Honeywell.txt
 call :doCmd !_regedit! /E "!_RegFileOut!" "HKEY_LOCAL_MACHINE\SOFTWARE\Honeywell"
@@ -1204,9 +1204,11 @@ call :doCmd copy /y "%HwProgramData%\Experion PKS\CurrentLogIndex.txt" "!_DirWor
 call :doCmd copy /y "%HwProgramData%\Experion PKS\ErrLog_*.txt" "!_DirWork!\ErrorHandling\"
 
 :: get CreateSQLObject logs
-call :logitem get CreateSQLObject logs
-call :mkNewDir !_DirWork!\CreateSQL-Logs
-call :doCmd copy /y "%HwProgramData%\\Experion PKS\Server\data\CreateSQLObject*.txt" "!_DirWork!\CreateSQL-Logs\"
+if exist "%HwProgramData%\\Experion PKS\Server\data\CreateSQLObject*.txt" (
+	call :logitem get CreateSQLObject logs
+	call :mkNewDir !_DirWork!\CreateSQL-Logs
+	call :doCmd copy /y "%HwProgramData%\\Experion PKS\Server\data\CreateSQLObject*.txt" "!_DirWork!\CreateSQL-Logs\"
+)
 
 :: get SQL errorlog files
 where sqlcmd >NUL 2>&1
@@ -1325,10 +1327,18 @@ call :LogWmicCmd !_DirWork!\GeneralSystemInfo\_WmiRootSecurityDescriptor.txt wmi
 reg query "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
 	call :logitem . McAfee On Access Scanner - reg settings
-	::call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore\On Access Scanner" "!_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt"
 	call :mkNewDir  !_DirWork!\RegistryInfo
 	call :doCmd REG EXPORT "HKLM\SOFTWARE\Wow6432Node\McAfee\SystemCore\VSCore" "!_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt"
+) else (
+	if exist "%SystemRoot%\System32\drivers\mfe*.*" (
+		set _RegFile="!_DirWork!\RegistryInfo\_HKLM_McAfee_OnAccessScanner.txt"
+		call :mkNewDir  !_DirWork!\RegistryInfo
+		call :GetReg QUERY "HKLM\SOFTWARE"
+		call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node"
+	)
 )
+:: ToDo: test - where are the 'McAfee Agent' registry settings
+
 
 :: Symantec\Symantec Endpoint Protection\AV
 reg query "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" >NUL 2>&1
@@ -1869,6 +1879,16 @@ if exist "%HwProgramData%\Experion PKS\Server\data\mapping\" (
 	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at get mapping xml files with PowerShell'. )
 	if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'get mapping xml files with PowerShell' failed.)
 )
+
+if exist "%HwProgramData%\Experion PKS\Server\data\scripts\" (
+	call :logItem . get server scripts xml files
+	call :mkNewDir !_DirWork!\ServerDataDirectory
+	call :mkNewDir !_DirWork!\ServerDataDirectory\_scripts
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\Server\data\scripts\' -filt *.xml | foreach{copy $_.fullName -dest '!_DirWork!\ServerDataDirectory\_scripts'; sleep -Milliseconds 100} }}
+	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at get server scripts xml files with PowerShell'. )
+	if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'get server scripts xml files with PowerShell' failed.)
+)
+
 
 if defined _isServer (
 	where lisscn >NUL 2>&1
@@ -2431,3 +2451,5 @@ exit /b 1 -- no cab, end compress
 ::    get SQL Error log files
 ::  - v1.40
 ::    netsh int tcp show heuristics
+::    fix: if exist "%HwProgramData%\\Experion PKS\Server\data\CreateSQLObject*.txt"
+::    get server scripts xml files

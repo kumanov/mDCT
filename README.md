@@ -136,7 +136,8 @@ Usage examples:
   - dsasublist output
   - filfrag output
   - lisscn output
-  - mapping tps.xml
+  - get mapping xml files
+  - get server scripts xml files
   - dual_status
   - cstn_status
   - ps output
