@@ -3,7 +3,7 @@
 setlocal enableDelayedExpansion
 
 
-set _ScriptVersion=v1.40
+set _ScriptVersion=v1.41
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
@@ -14,7 +14,7 @@ set _ScriptVersion=v1.40
 ::  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ::  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-@if defined _DbgOut ( echo. .. **  Start of mDCT++)
+@if defined _Debug ( echo [#Debug#] !time!: Start of mDCT++)
 :: handle /?
 if "%~1"=="/?" (
 	call :usage
@@ -23,9 +23,9 @@ if "%~1"=="/?" (
 
 set _DirScript=%~dp0
 call :preRequisites
-if /i "%errorlevel%" NEQ "0" (goto :eof)
+if /i "%errorlevel%" NEQ "0" (@goto :eof)
 call :Initialize %*
-if /i "!_Usage!" EQU "1" (goto :eof)
+if /i "!_Usage!" EQU "1" (@goto :eof)
 call :CollectDctData
 call :getPerformanceLogs
 call :CollectAdditionalData
@@ -39,7 +39,7 @@ if "%errorlevel%"=="0" (
 echo.done.
 :: restore cmd title
 title Command Prompt
-@echo. & goto :eof
+@echo. & @goto :eof
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -48,7 +48,7 @@ title Command Prompt
 	@echo ..check preRequisites
 	:: check current user account permissions - Admin required
 	call :check_Permissions
-	if "%errorlevel%" neq "0" goto :eof
+	if "%errorlevel%" neq "0" @goto :eof
 	
 	:: require no spaces in full path
 	if not "%_DirScript%"=="%_DirScript: =%" ( echo.
@@ -69,7 +69,7 @@ title Command Prompt
 		call :WriteHostNoLog green black Success: user account group membership
 	)
 
-	goto :eof
+	@goto :eof
 :endregion
 
 :region initialize
@@ -83,13 +83,13 @@ chcp 437 >NUL
 SET _title=%~nx0 - version %_ScriptVersion%
 TITLE %_title% & set _title=
 
-@if defined _DbgOut ( echo. .. **  _DirScript: %_DirScript% )
+@if defined _Debug ( echo [#Debug#] !time!: _DirScript: %_DirScript% )
 
 :: Change Directory to the location of the batch script file (%0)
 CD /d "%_DirScript%"
 @echo. .. starting '%_DirScript%%~n0 %*'
 
-::@::if defined _DbgOut ( echo. .. **  Start of mDCT++ ^(%_ScriptVersion% - krasimir.kumanov@gmail.com^))
+::@::if defined _Debug ( echo [#Debug#] !time!: Start of mDCT++ ^(%_ScriptVersion% - krasimir.kumanov@gmail.com^))
 call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersion% - krasimir.kumanov@gmail.com]
 
 :region Configuration parameters ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -118,7 +118,7 @@ call :WriteHostNoLog white black %date% %time% : Start of mDCT++ [%_ScriptVersio
 	@set _HSCServerType=
 	(for /f "tokens=2,* delims= " %%h in ('reg query "HKLM\SOFTWARE\Wow6432Node\Honeywell" /v HSCServerType ^| find /i "Server"') do @set _HSCServerType=%%i) 2>NUL
 	:: is Server
-	@if defined _DbgOut ( echo. .. ** _HSCServerType=%_HSCServerType%)
+	@if defined _Debug ( echo [#Debug#] !time!: _HSCServerType=%_HSCServerType%)
 	if NOT "%_HSCServerType%"=="%_HSCServerType:Server=%" (
 		@set _isServer=1
 	) else (
@@ -165,17 +165,17 @@ if "%PROCESSOR_ARCHITECTURE%" equ "x86" (
 )
 
 set _Comp_Time=%COMPUTERNAME%_!_CurDateTime!
-@if defined _DbgOut ( echo. .. **  _Comp_Time: %_Comp_Time% )
+@if defined _Debug ( echo [#Debug#] !time!: _Comp_Time: %_Comp_Time% )
 :: set work folder
 set _DirWork=%_DirScript%%_Comp_Time%
 
-@if defined _DbgOut ( echo. .. **  _DirWork: !_DirWork! )
+@if defined _Debug ( echo [#Debug#] !time!: _DirWork: !_DirWork! )
 
 :: init working dir
 call :mkNewDir !_DirWork!
 :: init LogFile
 if not defined _LogFile set _LogFile=!_DirWork!\mDCTlog.txt
-@if defined _DbgOut ( echo. .. ** _LogFile: !_LogFile! )
+@if defined _Debug ( echo [#Debug#] !time!: _LogFile: !_LogFile! )
 call :InitLog "!_LogFile!"
 
 :: change priority to idle - this & all child commands
@@ -218,6 +218,8 @@ goto :eof
 		set _KnownArg=1)
 	if /i "%~1"=="noCabZip"  (set _noCabZip=1
 		set _KnownArg=1)
+	if /i "%~1"=="Debug"  (set _Debug=1
+		set _KnownArg=1)
 
 	if /i "!_KnownArg!"=="0" (
 		@echo.
@@ -251,7 +253,7 @@ goto :eof
 	for /f "tokens=3 delims=." %%o in ('echo %_OSVER%') do @set _OSVER3=%%o
 	for /f "tokens=4 delims=." %%o in ('echo %_OSVER%') do @set _OSVER4=%%o
 	for /f "tokens=4-8 delims=[.] " %%i in ('ver') do (if %%i==Version (set _v=%%j.%%k.%%l.%%m) else (set _v=%%i.%%j.%%k.%%l))
-	@if defined _DbgOut ( echo. .. ** ###getWinVer OS: %_OSVER1% %_OSVER2% %_OSVER3% %_OSVER4% Version %_v% )
+	@if defined _Debug ( echo [#Debug#] !time!: ###getWinVer OS: %_OSVER1% %_OSVER2% %_OSVER3% %_OSVER4% Version %_v% )
 	:: echo Windows Version: %_v%
 	:: 10.0 - Windows 10		10240 RTM, 10586 TH2 v1511, 14393 RS1 v1607, 15063 RS2 v1703, 16299 RS3 1709, 17134 RS4 1803, 17692 RS5 1809
 	::  6.3 - Windows 8.1 and Windows Server 2012R2 9600
@@ -391,6 +393,19 @@ goto :eof
 	ENDLOCAL
 	@goto :eof
 
+:LogCmdNoSleep [filename; command] - UTILITY to log command header and output in filename
+	SETLOCAL
+	for /f "tokens=1* delims=; " %%a in ("%*") do (
+		set _LogFileName=%%a
+		call :logLine "!_LogFileName!"
+		@echo ===== %time% : %%b >> "!_LogFileName!"
+		call :logLine "!_LogFileName!"
+		%%b >> "!_LogFileName!" 2>&1
+	)
+	@echo. >> "!_LogFileName!"
+	ENDLOCAL
+	@goto :eof
+
 :LogWmicCmd [filename; command] - UTILITY to log command header and output in filename
 	SETLOCAL
 	for /f "tokens=1* delims=; " %%a in ("%*") do (
@@ -416,7 +431,7 @@ goto :eof
 	set _NewDir=!_NewDir:"=!!"!
 	if not exist "%_NewDir%" mkdir "%_NewDir%"
 	ENDLOCAL & REM -- RETURN VALUES
-	goto :eof
+	@goto :eof
 
 :WriteHost [ forground background message]
 	for /f "tokens=1,2* delims=; " %%a in ("%*") do (
@@ -443,6 +458,16 @@ goto :eof
 	@echo ===== %time% : REG.EXE %* >> %_RegFile%
 	call :logLine %_RegFile%
 	%SYSTEMROOT%\SYSTEM32\REG.EXE %* >> %_RegFile% 2>&1
+	@goto :eof
+
+:GetReg_async [ filename "key"]
+	for /f "tokens=1* delims= " %%a in ("%*") do (
+		@echo.>> %%a
+		call :logLine %%a
+		@echo ===== %time% : REG QUERY %%b >> %%a
+		call :logLine %%a
+		START /WAIT "Please wait for REG QUERY to finish.." /MIN CMD /C "%SYSTEMROOT%\SYSTEM32\REG.EXE QUERY %%b >> %%a 2>&1"
+	)
 	@goto :eof
 
 :GetRegValue Key Value Data Type -- returns a registry value
@@ -481,12 +506,12 @@ EXIT /b
 	@echo. >> %_SqlFile%
 	@goto :eof
 
-:DoGetSVC [comment] - UTILITY to dump Service information into log file
+:getSVC [comment] - UTILITY to dump Service information into log file
 	call :logitem collecting Services info at %~1
 	set _ServicesFile=!_DirWork!\GeneralSystemInfo\serviceslist.txt
 	call :InitLog !_ServicesFile!
 	call :LogCmd !_ServicesFile! SC.exe query type= all state= all
-	call :SleepX 1
+	call :SleepX 2
 	@goto :eof
 
 :DoNltestDomInfo [comment] - UTILITY to dump NLTEST Domain infos into log file
@@ -565,7 +590,7 @@ call :InitLog !_outFile!
 >>!_psFile! echo $('{0} processes; {1}/{2} with/without GDI objects' -f $allProcesses.Count, $GuiResources.Count, ($allProcesses.Count - $GuiResources.Count)) ^| out-file '!_outFile!' -Append -Encoding ascii
 >>!_psFile! echo "Total number of GDI handles: $auxCountHandles" ^| out-file '!_outFile!' -Append -Encoding ascii
 PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass %_psFile%
-@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at getGDIHandlesCount with PowerShell'. )
+@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at getGDIHandlesCount with PowerShell'. )
 if "%errorlevel%" neq "0" (
 	call :logItem %time% .. ERROR: %errorlevel% - 'getGDIHandlesCount with PowerShell' failed.
 	)
@@ -588,7 +613,7 @@ exit /b
 	>>!_outFile! echo get '!_groupName!' members
 	>>!_outFile! echo ========================================
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { @(try{@(([ADSI]'WinNT://./!_groupName!').Invoke('Members'))}catch{}) | foreach{$_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null)} | Out-File '!_outFile!' -Append -Encoding ascii }}"
-	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - at get '!_groupName!' members with PowerShell. )
+	@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - at get '!_groupName!' members with PowerShell. )
 	if "%errorlevel%" neq "0" (
 		call :logItem %time% .. ERROR: %errorlevel% - get '!_groupName!' members with PowerShell failed.
 		)
@@ -693,7 +718,15 @@ exit /b
 	if not exist "%HwInstallPath%\Experion PKS\User Assistance" (
 		ICACLS "%HwInstallPath%\Experion PKS" /verify /T /C /L /Q >>!_AclVerify!
 	)
-	@echo.>>!_AclVerify!
+	
+	if exist "%HwProgramData%\Experion PKS\PatchDB" (
+		call :logOnlyItem . VERIFY THE PATCH DB FOLDER SECURITY
+		@echo.>>!_AclVerify!
+		call :logLine !_AclVerify!
+		@echo ===== !time! : ICACLS "%HwProgramData%\Experion PKS\PatchDB" >>!_AclVerify!
+		call :logLine !_AclVerify!
+		call :LogCmd !_AclVerify! ICACLS "%HwProgramData%\Experion PKS\PatchDB"
+	)
 	
 	(ENDLOCAL & REM -- RETURN VALUES
 	)
@@ -703,7 +736,7 @@ exit /b
 ::                 -- %~1 [in]: file to check
 ::                 -- %~1 [out,opt]: out var
 SETLOCAL
-@if defined _DbgOut ( echo. .. **  function isEmpty - file: %~f1 , size: %~z1 )
+@if defined _Debug ( echo [#Debug#] !time!: function isEmpty - file: %~f1 , size: %~z1 )
 if %~z1 == 0 (
 	set __isEmpty=1
 ) else (
@@ -849,7 +882,7 @@ exit /b
 	:: set events date/time limit
 	for /f "usebackq delims=" %%h in (`PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { (Get-Date).AddDays(-60).toString('s')+'Z' }}"`) do set "_TimeLimit=%%h"
 	:: export events
-	wevtutil epl "%_Channel%" "%_evtxFile%" "/q:*[System[TimeCreated[@SystemTime>='!_TimeLimit!']]]" /overwrite:true
+	wevtutil epl "!_Channel!" "!_evtxFile!" "/q:*[System[TimeCreated[@SystemTime>='!_TimeLimit!']]]" /overwrite:true
 	ENDLOCAL
 	call :SleepX 1
 	@goto :eof
@@ -886,7 +919,7 @@ exit /b
 :region DCT Data
 :CollectDctData
 :: return, if no DCT data required
-if /i "!_NoDctData!" EQU "1" (goto :eof)
+if /i "!_NoDctData!" EQU "1" (@goto :eof)
 
 call :logitem *** DCT data collection ... ***
 
@@ -912,19 +945,22 @@ call :InitLog !_DirWork!\GeneralSystemInfo\timezone.output.txt
 @echo TimeZone Bias: %_tzBias% >>"!_DirWork!\GeneralSystemInfo\timezone.output.txt"
 call :SleepX 1
 
-(call :logitem export Windows Events
+call :logitem export Windows Events
 call :export-evtx Application !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Application.evtx
+call :SleepX 1
 call :export-evtx FTE         !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_FTE.evtx
 call :export-evtx HwSnmp      !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_HwSnmp.evtx
 call :export-evtx HwSysEvt    !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_HwSysEvt.evtx
 call :export-evtx Security    !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Security.evtx
-call :export-evtx System      !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.evtx)
+call :SleepX 1
+call :export-evtx System      !_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.evtx
+call :SleepX 1
 
 call :logitem get Experion PKS Product Version file
 call :doCmd copy /y "%HwInstallPath%\Experion PKS\ProductVersion.txt" "!_DirWork!\GeneralSystemInfo\"
 
 call :logitem query services
-call :DoGetSVC %time%
+call :getSVC %time%
 :: one more second to sleep
 call :SleepX 1
 
@@ -951,14 +987,14 @@ call :mkNewDir  "!_DirWork!\FTELogs"
 for /r "%HwProgramData%\ProductConfig\FTE" %%g in (*.log) do (type %%g >"!_DirWork!\FTELogs\%%~ng%%~xg")
 
 call :logitem get HMIWeb log files
-call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*.txt" "!_DirWork!\Station-logs\"
+call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\*log*.txt" "!_DirWork!\Station-logs\"
 if NOT "_isServer"=="1" (
 	::old cmd:: call :doCmd xcopy /i/q/y/H "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" "!_DirWork!\Station-logs\Rollover-logs\"
 	if exist "%HwProgramData%\HMIWebLog\Archived Logfiles\*.txt" (
 		call :logOnlyItem get HMIWeb backup log files
 		call :mkNewDir !_DirWork!\Station-logs\Rollover-logs
 		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\HMIWebLog\Archived Logfiles\' -filt *.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\Station-logs\Rollover-logs'; sleep -Milliseconds 500} }}
-		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy station log archived files with PowerShell'. )
+		@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at Copy station log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy station log archived files with PowerShell' failed.)
 	)
 )
@@ -987,7 +1023,7 @@ if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
 		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt log*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
-		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
 	:: copy CDA log archives
@@ -997,7 +1033,7 @@ if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
 		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt log*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
-		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
 	:: copy SR log archives
@@ -1007,7 +1043,7 @@ if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
 		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt logS*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
-		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
 	:: copy Activity log archives
@@ -1017,7 +1053,7 @@ if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
 		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt log*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
-		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
 	:: copy EnggTools log archives
@@ -1027,7 +1063,7 @@ if exist "%HwProgramData%\Experion PKS\logfiles\logServer.txt" (
 		call :logOnlyitem _LogArchiveDirectory=!_LogArchiveDirectory!
 		call :mkNewDir !_DirWork!\SloggerLogs\Archives
 		PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '!_LogArchiveDirectory!' -filt log*.txt | where{$_.LastWriteTime -gt (get-date).AddDays(-14)} | foreach{copy $_.fullName -dest '!_DirWork!\SloggerLogs\Archives\'; sleep -Milliseconds 500} }}
-		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
+		@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at Copy server log archived files with PowerShell'. )
 		if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy server log archived files with PowerShell' failed.)
 	)
 )
@@ -1220,6 +1256,12 @@ if %errorlevel% EQU 0 (
 )
 
 
+if exist "%HwProgramData%\Experion PKS\Server\data\das\DasConfig.xml" (
+	call :logitem get DasConfig.xml
+	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\das\DasConfig.xml" "!_DirWork!\ServerDataDirectory\"
+)
+
+
 goto :eof
 :endregion
 
@@ -1227,7 +1269,7 @@ goto :eof
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :CollectAdditionalData
 :: return, if no Additional data required
-if /i "!_NoAddData!" EQU "1" (goto :eof)
+if /i "!_NoAddData!" EQU "1" (@goto :eof)
 
 call :logitem *** Additional data collection ... ***
 
@@ -1250,11 +1292,7 @@ call :LogCmd !_DirWork!\GeneralSystemInfo\_SystemInfo.txt systeminfo.exe
 
 call :logitem . whoami - currently logged in user
 call :InitLog !_DirWork!\GeneralSystemInfo\_whoami.txt
-call :LogCmd !_DirWork!\GeneralSystemInfo\_whoami.txt whoami /all
-
-call :logitem . fetching environment Variables
-call :InitLog !_DirWork!\GeneralSystemInfo\_EnvVariables.txt
-call :LogCmd !_DirWork!\GeneralSystemInfo\_EnvVariables.txt set
+START "Please wait on WhoAmI.exe to finish..." /MIN /D "!_DirWork!" CMD /C "whoami.exe -all >"!_DirWork!\GeneralSystemInfo\_whoami.txt""
 
 call :logitem . scheduled task - query
 schtasks /query /xml ONE >!_DirWork!\GeneralSystemInfo\_scheduled_tasks.xml
@@ -1263,8 +1301,8 @@ call :SleepX 1
 
 call :logitem . collecting GPResult output
 set _GPresultFile=!_DirWork!\GeneralSystemInfo\_GPresult.htm
-call :doCmd gpresult /h "!_GPresultFile!" /f
-if "%errorlevel%" neq "0" call :LogCmd !_DirWork!\GeneralSystemInfo\_GPresultZ.txt gpresult /Z
+START "Please wait on GPresult.exe to finish..." /MIN /D "!_DirWork!" CMD /C "GPresult.exe /h "!_GPresultFile!" /f"
+REM if "%errorlevel%" neq "0" call :LogCmd !_DirWork!\GeneralSystemInfo\_GPresultZ.txt gpresult /Z
 
 
 call :DoNltestDomInfo
@@ -1343,7 +1381,7 @@ if %ERRORLEVEL% EQU 0 (
 :: Symantec\Symantec Endpoint Protection\AV
 reg query "HKLM\SOFTWARE\WOW6432Node\Symantec\Symantec Endpoint Protection\AV" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
-	call :logitem . Symantec Endpoint Protection / AV - reg settings
+	call :logitem . SEP / AV - reg settings
 	call :mkNewDir  !_DirWork!\RegistryInfo
 	set _RegFile="!_DirWork!\RegistryInfo\_Symantec_SEP_AV.txt"
 	call :InitLog !_RegFile!
@@ -1390,7 +1428,7 @@ set _RegFile="!_DirWork!\RegistryInfo\_HKLM_Services.txt"
 call :InitLog !_RegFile!
 call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 
-@if defined _DbgOut ( echo. .. ** reg query misc)
+@if defined _Debug ( echo [#Debug#] !time!: reg query misc)
 call :logOnlyItem . reg query misc
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile="!_DirWork!\RegistryInfo\_reg_query_misc.txt"
@@ -1400,7 +1438,9 @@ call :GetReg QUERY "HKLM\Software\Policies\Microsoft\Windows Defender" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /s
 :: Art.No: 000102530 - Disable "Updates available" notifications popping up on the operator screen when using WSUS
-call :GetReg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /s
+call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /s
+:: AllowCortana in Windows Search
+call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /s
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MusNotification.exe"
 call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MusNotificationUx.exe"
 :: acronis registry settings
@@ -1415,8 +1455,18 @@ call :GetReg QUERY "HKLM\SOFTWARE\Acronis"
 call :GetReg QUERY "HKCU\SOFTWARE\Microsoft\Internet Explorer\Main" /v UseSWRender
 :: security-enhanced channel protocols
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /s
+:: KSM2020-035 (Art.No: 000115926) Microsoft Defect in IE11 causing high CPU on Experion R50x and R51x Station processes resolved in September’20 (or later) roll up
+call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Policies\Microsoft\FeatureManagement" /s
+call :GetReg QUERY "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" /s
+:: Solution to enable RSLinx to be used with Experion R51x - reg key: .\Rockwell Software\FactoryTalk Diagnostics
+reg query "HKLM\SOFTWARE\Wow6432Node\Rockwell Software\FactoryTalk Diagnostics" >NUL 2>&1
+if %ERRORLEVEL% EQU 0 (
+	call :logitem . Rockwell Software\FactoryTalk Diagnostics - reg settings
+	call :GetReg QUERY "HKLM\SOFTWARE\Wow6432Node\Rockwell Software\FactoryTalk Diagnostics"
+)
 
-@if defined _DbgOut ( echo. .. ** Windows Time status/settings)
+
+@if defined _Debug ( echo [#Debug#] !time!: Windows Time status/settings)
 call :logItem . Windows Time status/settings
 set _WindowsTimeFile="!_DirWork!\GeneralSystemInfo\_WindowsTime.txt"
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
@@ -1427,7 +1477,7 @@ set _RegFile=!_WindowsTimeFile!
 call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Services\W32Time" /s  /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 
 :: temperature
-@if defined _DbgOut ( echo. .. ** _VEP=!_VEP!)
+@if defined _Debug ( echo [#Debug#] !time!: _VEP=!_VEP!)
 if not "!_VEP!"=="1" (
 	wmic /namespace:\\root\wmi PATH MSAcpi_ThermalZoneTemperature get Active,CriticalTripPoint,CurrentTemperature 2>NUL | find/i "CurrentTemperature" >NUL 2>&1
 	if !errorlevel!==0 (
@@ -1443,7 +1493,7 @@ if not "!_VEP!"=="1" (
 )
 
 :: get GDI Handles Count
-@if defined _DbgOut ( echo. .. ** getGDIHandlesCount)
+@if defined _Debug ( echo [#Debug#] !time!: getGDIHandlesCount)
 call :getGDIHandlesCount
 
 :localgroups
@@ -1460,6 +1510,9 @@ call :LogCmd !_localgroups! net localgroup "Local SecureComms Administrators"
 call :LogCmd !_localgroups! net localgroup "Local Supervisors"
 call :LogCmd !_localgroups! net localgroup "Local View Only Users"
 call :LogCmd !_localgroups! net localgroup "Distributed COM Users"
+if "!_isServer!"=="1" (
+	call :LogCmd !_localgroups! net localgroup "Local DSA Connections"
+)
 
 call :logitem . get HKEY_USERS Reg Values
 set _RegFile="!_DirWork!\RegistryInfo\_HKEY_USERS.txt"
@@ -1533,6 +1586,7 @@ call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :export-evtx Microsoft-Windows-TerminalServices-LocalSessionManager/Operational !_DirWork!\GeneralSystemInfo\
 call :export-evtx Microsoft-Windows-TaskScheduler/Operational !_DirWork!\GeneralSystemInfo\
 call :export-evtx "Microsoft-Windows-Windows Firewall With Advanced Security/Firewall" !_DirWork!\GeneralSystemInfo\
+call :export-evtx "Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin" !_DirWork!\GeneralSystemInfo\
 :: System & Application event logs (errors & warnings) to csv
 PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {Get-WinEvent -LogName System -FilterXPath '*[System[(Level=1  or Level=2 or Level=3)]]' | select -Property TimeCreated,Id,LevelDisplayName,ProviderName,Message | Export-Csv '!_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_System.csv' -NoTypeInformation}"
 PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass -Command "& {Get-WinEvent -LogName Application -FilterXPath '*[System[(Level=1  or Level=2 or Level=3)]]' | select -Property TimeCreated,Id,LevelDisplayName,ProviderName,Message | Export-Csv '!_DirWork!\GeneralSystemInfo\%COMPUTERNAME%_Application.csv' -NoTypeInformation}"
@@ -1672,15 +1726,31 @@ call :logOnlyItem . reg query HKCU\Control Panel
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile="!_DirWork!\RegistryInfo\_HKCU_Control_Panel.txt"
 call :InitLog !_RegFile!
-call :GetReg QUERY  "HKCU\Control Panel" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg_async !_RegFile! "HKCU\Control Panel" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 
 call :logOnlyItem . reg query Internet Settings
 call :mkNewDir  !_DirWork!\RegistryInfo
 set _RegFile="!_DirWork!\RegistryInfo\_InternetSettings.txt"
 call :InitLog !_RegFile!
-call :GetReg QUERY "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
-call :GetReg QUERY "HKEY_USERS\S-1-5-18\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /s
-call :GetReg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings" /s
+call :GetReg_async !_RegFile! "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg_async !_RegFile! "HKEY_USERS\S-1-5-18\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /s
+call :GetReg_async !_RegFile! "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings" /s
+
+call :logOnlyItem . reg query Installed Components
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile="!_DirWork!\RegistryInfo\_InstalledComponents.txt"
+call :InitLog !_RegFile!
+call :GetReg_async !_RegFile! "HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components" /s
+
+call :logOnlyItem . Windows Policies
+call :mkNewDir  !_DirWork!\RegistryInfo
+set _RegFile="!_DirWork!\RegistryInfo\_Windows_Policies.txt"
+for %%h in ("HKLM\Software\Policies\Microsoft" "HKLM\SYSTEM\CurrentControlSet\Policies" "HKCU\Software\Policies") do ( call :GetReg_async !_RegFile! %%h /s)		
+
+
+call :logitem . fetching environment Variables
+call :InitLog !_DirWork!\GeneralSystemInfo\_EnvVariables.txt
+call :LogCmd !_DirWork!\GeneralSystemInfo\_EnvVariables.txt set
 
 
 :: next
@@ -1763,6 +1833,9 @@ call :logitem . net commands
 set _NetCmdFile=!_DirWork!\_Network\netcmd.txt
 call :InitLog !_NetCmdFile!
 call :LogCmd !_NetCmdFile! NET SHARE
+if !_PSVer! GEQ 5 (
+	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-SmbShare | select Name, ScopeName, FolderEnumerationMode, Path, Description |ft|out-string -width 200 }}" >>!_NetCmdFile!
+)
 call :LogCmd !_NetCmdFile! NET START
 call :LogCmd !_NetCmdFile! NET CONFIG SERVER
 call :LogCmd !_NetCmdFile! NET SESSION
@@ -1779,8 +1852,8 @@ set _RegFile="!_DirWork!\_Network\TcpIpParameters.txt"
 call :InitLog !_RegFile!
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Services\FTEMUXMP" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /v ArpRetryCount
-call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp\Parameters" /s
-call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\Tcpip6\Parameters" /s
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\TcpIp" /s
+call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\Tcpip6" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\tcpipreg" /s
 call :GetReg QUERY "HKLM\System\CurrentControlSet\Services\iphlpsvc" /s
 call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\Network" /s
@@ -1794,7 +1867,7 @@ call :LogWmicCmd !_NicConfig! wmic nicconfig get Description,DHCPEnabled,Index,I
 call :LogWmicCmd !_NicConfig! wmic nicconfig get
 
 
-call :logitem . msft_providers get Provider,HostProcessIdentifier
+call :logitem . msft_providers
 call :InitLog !_DirWork!\_Network\msft_providers.txt
 call :LogWmicCmd !_DirWork!\_Network\msft_providers.txt wmic path msft_providers get Provider,HostProcessIdentifier
 
@@ -1853,7 +1926,8 @@ call :InitLog !_CrashDumpsList!
 ::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\SysWOW64\config\systemprofile\AppData\Local\CrashDumps\*.dmp
 ::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\ServiceProfiles\*.dmp
 ::call :logCmd  !_CrashDumpsList! dir  /o-d /s %windir%\LiveKernelReports\*.dmp
-START "Crash dump files list" /MIN CMD /C "dir /o-d /s %SystemDrive%\*.dmp >> !_CrashDumpsList!" 2>&1
+
+START "Crash dump files list" /MIN CMD /C "dir /o-d /s %SystemDrive%\*.dmp >> "!_CrashDumpsList!"" 2>&1
 call :SleepX 3
 
 if NOT "!_VEP!"=="1" (
@@ -1876,7 +1950,7 @@ if exist "%HwProgramData%\Experion PKS\Server\data\mapping\" (
 	call :mkNewDir !_DirWork!\ServerDataDirectory
 	call :mkNewDir !_DirWork!\ServerDataDirectory\_mapping
 	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\Server\data\mapping\' -filt *.xml | foreach{copy $_.fullName -dest '!_DirWork!\ServerDataDirectory\_mapping'; sleep -Milliseconds 250} }}
-	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at get mapping xml files with PowerShell'. )
+	@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at get mapping xml files with PowerShell'. )
 	if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'get mapping xml files with PowerShell' failed.)
 )
 
@@ -1885,7 +1959,7 @@ if exist "%HwProgramData%\Experion PKS\Server\data\scripts\" (
 	call :mkNewDir !_DirWork!\ServerDataDirectory
 	call :mkNewDir !_DirWork!\ServerDataDirectory\_scripts
 	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci '%HwProgramData%\Experion PKS\Server\data\scripts\' -filt *.xml | foreach{copy $_.fullName -dest '!_DirWork!\ServerDataDirectory\_scripts'; sleep -Milliseconds 100} }}
-	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at get server scripts xml files with PowerShell'. )
+	@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at get server scripts xml files with PowerShell'. )
 	if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'get server scripts xml files with PowerShell' failed.)
 )
 
@@ -1897,10 +1971,16 @@ if defined _isServer (
 		call :mkNewDir !_DirWork!\ServerDataDirectory
 		for /f "tokens=2 delims= " %%h in ('hdwbckbld ^| find /i "DEF CHN"') do (
 			@set _CHN=%%h
+			REM remove CHN
+			@set _CHN=!_CHN:CHN=!
+			REM remove leading zeroes
+			REM set /a num=1000%_x% %% 1000
+			FOR /F "tokens=* delims=0" %%A IN ("!_CHN!") DO @set _CHN=%%A
 			@set /a _CHN=!_CHN:CHN=!
-			call :logcmd "!_DirWork!\ServerDataDirectory\_lisscn.txt" lisscn -CHN !_CHN!
-			call :logcmd "!_DirWork!\ServerDataDirectory\_lisscn_all.txt" lisscn -CHN !_CHN! -all_ref
+			call :LogCmdNoSleep "!_DirWork!\ServerDataDirectory\_lisscn.txt" lisscn -CHN !_CHN!
+			call :LogCmdNoSleep "!_DirWork!\ServerDataDirectory\_lisscn_all.txt" lisscn -CHN !_CHN! -all_ref
 		)
+		call :SleepX 1
 	)
 
 	where dsasublist >NUL 2>&1
@@ -2004,9 +2084,9 @@ if exist "%HwProgramData%\HMIWebLog\Log.txt" (
 	call :getStationFiles
 )
 
-@if defined _DbgOut ( echo. .. ** _isTPS=!_isTPS!)
+@if defined _Debug ( echo [#Debug#] !time!: _isTPS=!_isTPS!)
 if "!_isTPS!"=="1" (
-	@if defined _DbgOut ( echo. .. ** _isServer=!_isServer!)
+	@if defined _Debug ( echo [#Debug#] !time!: _isServer=!_isServer!)
 	if "!_isServer!"=="1" (
 		call :logitem . chkem /tpsmappings
 		call :mkNewDir !_DirWork!\ServerRunDirectory
@@ -2076,7 +2156,7 @@ if %errorlevel%==0 (
 
 if exist "%HwProgramData%\Experion PKS\Server\data\flbkup.def" (
 	call :logitem . copy flbkup.def file
-	call :mkNewDir !_DirWork!\Station-logs
+	call :mkNewDir !_DirWork!\ServerDataDirectory
 	call :doCmd copy /y "%HwProgramData%\Experion PKS\Server\data\flbkup.def" "!_DirWork!\ServerDataDirectory\_flbkup.def"
 )
 
@@ -2099,6 +2179,27 @@ call :GetRegValue "!_regEPKS!" ArchiveDirectory _ArchiveDirectory
 			)
 			call :logcmd !_HistoryRO! dir /s/a:r %%h
 		)
+		
+		call :logOnlyItem . search hidden files in %%h
+		dir /ah/s/b %%h >NUL 2>&1
+		if [!errorlevel!] EQU [0] (
+			if not exist !_HistoryRO! (
+				call :mkNewDir !_DirWork!\ServerDataDirectory
+				call :InitLog !_HistoryRO!
+			)
+			call :logcmd !_HistoryRO! dir /ah/s/b %%h
+		)
+		
+		call :logOnlyItem . search system files in %%h
+		dir /as/s/b %%h >NUL 2>&1
+		if [!errorlevel!] EQU [0] (
+			if not exist !_HistoryRO! (
+				call :mkNewDir !_DirWork!\ServerDataDirectory
+				call :InitLog !_HistoryRO!
+			)
+			call :logcmd !_HistoryRO! dir /as/s/b %%h
+		)
+		
 	)
 )
 
@@ -2108,9 +2209,9 @@ if defined _isServer (
 	call :InitLog "!_DirWork!\ServerRunDirectory\_duplicates.txt"
 	call :doCmd fixduplicates -report "!_DirWork!\ServerRunDirectory\_duplicates.txt"
 	call :isEmpty "!_DirWork!\ServerRunDirectory\_duplicates.txt" _isEmptyFixDuplicates
-	@if defined _DbgOut ( echo. .. **  isEmpty return - _isEmptyFixDuplicates: !_isEmptyFixDuplicates! )
+	@if defined _Debug ( echo [#Debug#] !time!: isEmpty return - _isEmptyFixDuplicates: !_isEmptyFixDuplicates! )
 	if "!_isEmptyFixDuplicates!"=="1" (
-		@if defined _DbgOut ( echo. .. **  delete empty file "!_DirWork!\ServerRunDirectory\_duplicates.txt" )
+		@if defined _Debug ( echo [#Debug#] !time!: delete empty file "!_DirWork!\ServerRunDirectory\_duplicates.txt" )
 		del "!_DirWork!\ServerRunDirectory\_duplicates.txt"
 	)
 )
@@ -2131,7 +2232,24 @@ if %errorlevel%==0 (
 	call :logItem . export Experion operator settings
 	call :mkNewDir  !_DirWork!\ServerRunDirectory
 	call :doCmd databld -export -def OPERATORS -out "!_DirWork!\ServerRunDirectory\_OPERATORS.xml"
+	REM call :logCmd !_DirWork!\ServerRunDirectory\_OPERATORS.dmp.txt operdmp
 )
+
+call :logitem . find system/hidden files in HwProgramData
+call :mkNewDir !_DirWork!\ServerDataDirectory
+REM dir /ah/s/b %HwProgramData% >"!_DirWork!\ServerDataDirectory\_HwProgramDataHiddenFiles.txt" 2>NUL
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { $files=Get-ChildItem -Hidden '%HwProgramData%' -Exclude Thumbs.db -Recurse; if($files) {$files | out-file '!_DirWork!\ServerDataDirectory\_HwProgramDataHiddenFiles.txt' }}}"
+REM dir /as/s/b %HwProgramData% >"!_DirWork!\ServerDataDirectory\_HwProgramDataSystemFiles.txt" 2>NUL
+PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { $files=Get-ChildItem -System '%HwProgramData%' -Exclude Thumbs.db -Recurse; if($files) {$files | out-file '!_DirWork!\ServerDataDirectory\_HwProgramDataSystemFiles.txt' }}}"
+
+if exist "%HwProgramData%\Quick Builder\LogFiles\Default\" (
+	call :logitem . Quick Builder Log Files
+	call :mkNewDir !_DirWork!\SloggerLogs
+	call :mkNewDir !_DirWork!\SloggerLogs\_QBLogFiles
+	call :mkNewDir !_DirWork!\SloggerLogs\_QBLogFiles\Default
+	call :doCmd copy /y "%HwProgramData%\Quick Builder\LogFiles\Default\*.log" "!_DirWork!\SloggerLogs\_QBLogFiles\Default\"
+)
+
 
 goto :eof
 :endregion ExperionAddData
@@ -2141,7 +2259,7 @@ goto :eof
 where sqlcmd >NUL 2>&1
 if %errorlevel% NEQ 0 (
 	call :logOnlyItem no sqlcmd utility - skip sql queries
-	goto :eof
+	@goto :eof
 )
 	call :logitem * MS SQL queries *
 	call :mkNewDir !_DirWork!\MSSQL-Logs
@@ -2232,18 +2350,18 @@ goto :eof
 :endregion
 
 (:getPerformanceLogs
-	if /i "!_noPerfMon!" EQU "1" goto :eof -- exit function
+	if /i "!_noPerfMon!" EQU "1" @goto :eof -- exit function
 	call :logitem get Experion Performance Logs
 	if not defined HWPERFLOGPATH set HWPERFLOGPATH=%HwProgramData%\Experion PKS\Perfmon
 	if Not Exist "%HWPERFLOGPATH%" (
 		call :logOnlyItem perfmon folder Not Exist "%HWPERFLOGPATH%"
-		goto :eof
+	    @goto :eof
 	)
 	call :mkNewDir !_DirWork!\Perfmon Logs
 	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -Script{ gci $env:HWPERFLOGPATH -filt *.blg | where{$_.LastWriteTime -gt (get-date).AddDays(-10)} | foreach{copy $_.fullName -dest '!_DirWork!\Perfmon Logs\'; sleep 1} }}
-	@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Copy blg files with PowerShell'. )
+	@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at Copy blg files with PowerShell'. )
 	if "%errorlevel%" neq "0" ( call :logItem %time% .. ERROR: %errorlevel% - 'Copy blg files with PowerShell' failed.)
-	goto :eof
+    @goto :eof
 )
 
 
@@ -2282,7 +2400,7 @@ if !_PSVer! LEQ 2 (
 	:: next line only works for PS version greater v2
 	call :logitem .. PowerShell: compressing data %_DirWork% - please be patient...
 	PowerShell.exe -NonInteractive  -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { try { $ErrorActionPreference = 'continue'; Add-Type -Assembly 'System.IO.Compression.FileSystem'; [System.IO.Compression.ZipFile]::CreateFromDirectory('%_DirWork%', '%_DirWork%\..\!cabName!'); Exit 0 } catch { Write-host -ForegroundColor red 'Compress Failed'; Throw $error[0].Exception.Message; Exit 23 } }}"
-		@if defined _DbgOut ( echo. .. ** ERRORLEVEL: %errorlevel% - 'at Compress with PowerShell'. )
+		@if defined _Debug ( echo [#Debug#] !time!: ERRORLEVEL: %errorlevel% - 'at Compress with PowerShell'. )
 		if "%errorlevel%" neq "0" (
 			call :logItem %time% .. ERROR: %errorlevel% - 'Compress with PowerShell' failed.
 			set _DoCleanup=0
@@ -2453,3 +2571,21 @@ exit /b 1 -- no cab, end compress
 ::    netsh int tcp show heuristics
 ::    fix: if exist "%HwProgramData%\\Experion PKS\Server\data\CreateSQLObject*.txt"
 ::    get server scripts xml files
+::  - v1.41
+::    Reg QUERY "HKLM\SYSTEM\CurrentControlSet\Policies\Microsoft\FeatureManagement"
+::    reg query Installed Components
+::    find system/hidden files in HwProgramData
+::    Reg QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /s  (AllowCortana)
+::    Quick Builder Log Files
+::    fixed lisscn channel number parsing
+::    export-evtx "Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin"
+::    fixed xcopy of station logs
+::    changed search for hidden/system files to use PS
+::    Reg QUERY "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System
+::    get output of: net localgroup "Local DSA Connections"
+::    flbkup.def copy fix
+::    get DasConfig.xml
+::    get reg Windows Policies
+::    Rockwell Software\FactoryTalk Diagnostics - reg settings
+::    export-evtx - fixed(using !! instead of %%)
+::    VERIFY THE PATCH DB FOLDER SECURITY

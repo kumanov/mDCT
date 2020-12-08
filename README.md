@@ -81,6 +81,7 @@ Usage examples:
   - hdd defrag analysis
   - reg query HKCU\Control Panel
   - reg query services
+  - reg query Installed Components
 - Network information
   - netstat -nato
   - ipconfig /displaydns
@@ -160,3 +161,4 @@ Usage examples:
   - Experion GDA Table output
   - list HPSInstall temp folder
   - export Experion operator settings
+  - find system/hidden files in HwProgramData
