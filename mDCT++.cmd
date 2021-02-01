@@ -3,7 +3,7 @@
 setlocal enableDelayedExpansion
 
 
-set _ScriptVersion=v1.41
+set _ScriptVersion=v1.42
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
@@ -1584,6 +1584,9 @@ call :logCmd !_BranchcacheFile! DIR /A/B/S %windir%\ServiceProfiles\NetworkServi
 call :logitem . export additional Windows Event Logs
 call :mkNewDir  !_DirWork!\GeneralSystemInfo
 call :export-evtx Microsoft-Windows-TerminalServices-LocalSessionManager/Operational !_DirWork!\GeneralSystemInfo\
+call :export-evtx Microsoft-Windows-TerminalServices-LocalSessionManager/Admin !_DirWork!\GeneralSystemInfo\
+call :export-evtx Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational !_DirWork!\GeneralSystemInfo\
+call :export-evtx Microsoft-Windows-TerminalServices-RemoteConnectionManager/Admin !_DirWork!\GeneralSystemInfo\
 call :export-evtx Microsoft-Windows-TaskScheduler/Operational !_DirWork!\GeneralSystemInfo\
 call :export-evtx "Microsoft-Windows-Windows Firewall With Advanced Security/Firewall" !_DirWork!\GeneralSystemInfo\
 call :export-evtx "Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin" !_DirWork!\GeneralSystemInfo\
@@ -1646,6 +1649,7 @@ call :logCmd !_VssAdminListReport! vssadmin List Shadows
 call :logCmd !_VssAdminListReport! vssadmin List ShadowStorage
 call :logCmd !_VssAdminListReport! vssadmin List Volumes
 call :logCmd !_VssAdminListReport! vssadmin List Writers
+call :LogWmicCmd !_VssAdminListReport! wmic shadowcopy
 
 :: omreport
 where omreport >NUL 2>&1
@@ -2589,3 +2593,9 @@ exit /b 1 -- no cab, end compress
 ::    Rockwell Software\FactoryTalk Diagnostics - reg settings
 ::    export-evtx - fixed(using !! instead of %%)
 ::    VERIFY THE PATCH DB FOLDER SECURITY
+::  - v1.42
+::    Windows Event Logs
+::    - TerminalServicesLocalSessionManager --> Admin
+::    - TerminalServicesRemoteConnectionManager --> Operational
+::    - TerminalServicesRemoteConnectionManager --> Admin
+::    wmic shadowcopy output
