@@ -56,6 +56,7 @@ Usage examples:
     - HKLM\Software\Microsoft\RPC
     - HKLM\Software\Microsoft\OLE
     - HKLM\System\CurrentControlSet\Control\GraphicsDrivers
+    - HKLM\\SYSTEM\CurrentControlSet\Control\Video
     - McAfee VSE onaccess scanner settings
     - Symantec SEP AV settings
     - reg query misc
@@ -131,6 +132,7 @@ Usage examples:
   - SQLDBLogs status
   - SQL Loggins
   - NON_ERDB_POINTS_PARAMS
+  - get ps_erdb database stats
   - SQL Config & Memory Status
   = get SQL jobs history
 - Experion

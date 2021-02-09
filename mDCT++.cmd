@@ -21,7 +21,9 @@ if "%~1"=="/?" (
 	exit /b 0
 )
 
-set _DirScript=%~dp0
+::set _DirScript=%~dp0
+REM change to use current dirctory,not he script directory
+set _DirScript=%CD%\
 call :preRequisites
 if /i "%errorlevel%" NEQ "0" (@goto :eof)
 call :Initialize %*
@@ -56,7 +58,7 @@ title Command Prompt
 		call :WriteHostNoLog yellow black  Please use a different local path without space characters.
 		exit /b 1
 	) else (
-		call :WriteHostNoLog green black Success: no spaces in script full path
+		call :WriteHostNoLog green black Success: no spaces in folder full path
 	)
 	
 	:: user account membership : "Product Administrators" , "Local Engineers" , test
@@ -414,7 +416,7 @@ goto :eof
 		@echo ===== %time% : %%b >> "!_LogFileName!"
 		call :logLine "!_LogFileName!"
 		::%%b /Format:Texttable | more /s >> "!_LogFileName!" 2>&1
-		For /F "tokens=* delims=" %%h in ('%%b') do (
+		For /F "tokens=* delims=" %%h in ('%%b 2^>^&1') do (
 			set "_line=%%h"
 			set "_line=!_line:~0,-1!"
 			echo.!_line!>>"!_LogFileName!"
@@ -1421,6 +1423,8 @@ call :InitLog !_RegFile!
 call :GetReg QUERY  "HKCU\Control Panel\Desktop" /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 call :GetReg QUERY  "HKCU\Control Panel\Desktop\PerMonitorSettings" /s
 call :GetReg QUERY  "HKLM\System\CurrentControlSet\Control\GraphicsDrivers" /s
+call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Control\Video" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
+call :GetReg QUERY  "HKLM\SYSTEM\CurrentControlSet\Hardware Profiles\UnitedVideo" /s /t REG_SZ,REG_MULTI_SZ,REG_EXPAND_SZ,REG_DWORD,REG_QWORD,REG_NONE
 
 call :logOnlyItem . reg query services
 call :mkNewDir  !_DirWork!\RegistryInfo
@@ -2265,6 +2269,7 @@ if %errorlevel% NEQ 0 (
 	call :logOnlyItem no sqlcmd utility - skip sql queries
 	@goto :eof
 )
+:: non erdb points
 	call :logitem * MS SQL queries *
 	call :mkNewDir !_DirWork!\MSSQL-Logs
 	call :logitem . select count^(*^) from NON_ERDB_POINTS_PARAMS
@@ -2277,7 +2282,14 @@ if %errorlevel% NEQ 0 (
 	call :logLine !_SqlFile!
 	sqlcmd -E -w 10000 -d ps_erdb -Q "select cast(s.StrategyName as varchar(40)) as NonCEEStrategy, cast(containingStrat.StrategyName +'.'+ strat_cont.StrategyName as varchar(40)) as ReferencedBlock, CASE WHEN s.StrategyID  & 0x80000000 = 0 THEN 'Project' ELSE 'Monitoring' END 'Avatar' from STRATEGY S inner join NON_ERDB_POINTS_PARAMS N on n.StrategyID = S.StrategyID and n.ReferenceCount > 0 inner join CONNECTION Conn on conn.PassiveParamID = N.ParamID and conn.passivecontrolid = n.strategyid  INNER JOIN STRATEGY strat_cont ON strat_cont.StrategyID = conn.ActiveControlID INNER JOIN RELATIONSHIP rel ON rel.TargetID = strat_cont.StrategyID AND rel.RelationshipID = 3 INNER JOIN STRATEGY containingStrat ON rel.SourceID = containingStrat.StrategyID " >>!_SqlFile!
 
-	:: SQL Loggins
+:: ps_erdb stats
+	set _SqlFile="!_DirWork!\MSSQL-Logs\_erdb-stats.txt"
+	call :InitLog !_SqlFile!
+	call :logitem . get ps_erdb database stats
+	call :DoSqlCmd ps_erdb "SELECT a.object_id, cast(object_name(a.object_id) as varchar(60)) AS Object_Name, a.index_id, cast(name as varchar(60)) AS IndedxName, avg_fragmentation_in_percent FROM sys.dm_db_index_physical_stats (DB_ID (N'ps_erdb'), NULL, NULL, NULL, NULL) AS a INNER JOIN sys.indexes AS b ON a.object_id = b.object_id AND a.index_id = b.index_id where name is not null order by avg_fragmentation_in_percent desc"
+	call :DoSqlCmd ps_erdb "SELECT cast(object_name(stats.object_id) as varchar(60)) AS Object_Name, cast(indexes.name as varchar(60)) AS Index_Name, STATS_DATE(stats.object_id, stats.stats_id) AS Stats_Last_Update FROM sys.stats JOIN sys.indexes ON stats.object_id = indexes.object_id AND stats.name = indexes.name order by 3 desc"
+
+:: SQL Loggins
 	set _SqlFile="!_DirWork!\MSSQL-Logs\_SqlLogins.txt"
 	call :InitLog !_SqlFile!
 	call :logitem . EXEC sp_helplogins
@@ -2599,3 +2611,8 @@ exit /b 1 -- no cab, end compress
 ::    - TerminalServicesRemoteConnectionManager --> Operational
 ::    - TerminalServicesRemoteConnectionManager --> Admin
 ::    wmic shadowcopy output
+::    fix LogWmicCmd to capture errors
+::    get ps_erdb database stats
+::    HKLM\\SYSTEM\CurrentControlSet\Control\Video
+::    HKLM\SYSTEM\CurrentControlSet\Hardware Profiles\UnitedVideo
+::    change script to use current dirctory,not he script directory
