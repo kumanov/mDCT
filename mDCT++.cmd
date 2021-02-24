@@ -3,7 +3,7 @@
 setlocal enableDelayedExpansion
 
 
-set _ScriptVersion=v1.42
+set _ScriptVersion=v1.43
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::
@@ -15,7 +15,7 @@ set _ScriptVersion=v1.42
 ::  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 @if defined _Debug ( echo [#Debug#] !time!: Start of mDCT++)
-:: handle /?
+:: handle notifdmp
 if "%~1"=="/?" (
 	call :usage
 	exit /b 0
@@ -884,7 +884,7 @@ exit /b
 	:: set events date/time limit
 	for /f "usebackq delims=" %%h in (`PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { (Get-Date).AddDays(-60).toString('s')+'Z' }}"`) do set "_TimeLimit=%%h"
 	:: export events
-	wevtutil epl "!_Channel!" "!_evtxFile!" "/q:*[System[TimeCreated[@SystemTime>='!_TimeLimit!']]]" /overwrite:true
+	wevtutil epl "!_Channel!" "!_evtxFile!" "/q:*[System[TimeCreated[@SystemTime>='!_TimeLimit!']]]" /overwrite:true 2>NUL
 	ENDLOCAL
 	call :SleepX 1
 	@goto :eof
@@ -1445,8 +1445,6 @@ call :GetReg QUERY "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /s
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /s
 :: AllowCortana in Windows Search
 call :GetReg QUERY "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /s
-call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MusNotification.exe"
-call :GetReg QUERY "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\MusNotificationUx.exe"
 :: acronis registry settings
 reg query "HKLM\SOFTWARE\Wow6432Node\Acronis" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
@@ -1842,6 +1840,10 @@ set _NetCmdFile=!_DirWork!\_Network\netcmd.txt
 call :InitLog !_NetCmdFile!
 call :LogCmd !_NetCmdFile! NET SHARE
 if !_PSVer! GEQ 5 (
+	@echo.>>!_NetCmdFile!
+	call :logLine !_NetCmdFile!
+	@echo ===== %time% : Get-SmbShare >>!_NetCmdFile!
+	call :logLine !_NetCmdFile!
 	PowerShell.exe -NonInteractive -NoProfile -ExecutionPolicy Bypass "&{Invoke-Command -ScriptBlock { Get-SmbShare | select Name, ScopeName, FolderEnumerationMode, Path, Description |ft|out-string -width 200 }}" >>!_NetCmdFile!
 )
 call :LogCmd !_NetCmdFile! NET START
@@ -2258,6 +2260,12 @@ if exist "%HwProgramData%\Quick Builder\LogFiles\Default\" (
 	call :doCmd copy /y "%HwProgramData%\Quick Builder\LogFiles\Default\*.log" "!_DirWork!\SloggerLogs\_QBLogFiles\Default\"
 )
 
+if exist "%HwInstallPath%\Experion PKS\Install\SequencerStepFile.xml" (
+	call :logitem . get SequencerStepFile.xml
+	call :mkNewDir !_DirWork!\ServerSetupDirectory
+	call :doCmd copy /y "%HwInstallPath%\Experion PKS\Install\SequencerStepFile.xml" "!_DirWork!\ServerSetupDirectory\"
+)
+
 
 goto :eof
 :endregion ExperionAddData
@@ -2616,3 +2624,5 @@ exit /b 1 -- no cab, end compress
 ::    HKLM\\SYSTEM\CurrentControlSet\Control\Video
 ::    HKLM\SYSTEM\CurrentControlSet\Hardware Profiles\UnitedVideo
 ::    change script to use current dirctory,not he script directory
+::  - v1.43
+::    get SequencerStepFile.xml

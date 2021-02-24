@@ -135,6 +135,7 @@ Usage examples:
   - get ps_erdb database stats
   - SQL Config & Memory Status
   = get SQL jobs history
+  - get ps_erdb database stats
 - Experion
   - dsasublist output
   - filfrag output
@@ -164,3 +165,5 @@ Usage examples:
   - list HPSInstall temp folder
   - export Experion operator settings
   - find system/hidden files in HwProgramData
+  - get SequencerStepFile.xml
+ 
